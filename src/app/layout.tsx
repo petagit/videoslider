@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
+import { ThemeWatcher } from "../components/theme-toggle";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -22,11 +23,39 @@ export default function RootLayout({
 }: Readonly<{
   children: React.ReactNode;
 }>) {
+  const themeScript = `(() => {
+    const storageKey = 'video-editor-theme';
+    const root = document.documentElement;
+    const prefersDark = () => window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches;
+    let theme = 'dark';
+    try {
+      const stored = localStorage.getItem(storageKey);
+      if (stored === 'light' || stored === 'dark') {
+        theme = stored;
+      } else if (prefersDark()) {
+        theme = 'dark';
+      } else {
+        theme = 'light';
+      }
+    } catch (error) {
+      theme = prefersDark() ? 'dark' : 'light';
+    }
+    root.dataset.theme = theme;
+    if (theme === 'dark') {
+      root.classList.add('dark');
+    } else {
+      root.classList.remove('dark');
+    }
+    root.style.colorScheme = theme;
+  })();`;
+
   return (
-    <html lang="en">
-      <body
-        className={`${geistSans.variable} ${geistMono.variable} antialiased`}
-      >
+    <html lang="en" className="dark" suppressHydrationWarning>
+      <head>
+        <script dangerouslySetInnerHTML={{ __html: themeScript }} />
+      </head>
+      <body className={`${geistSans.variable} ${geistMono.variable} antialiased`}>
+        <ThemeWatcher />
         {children}
       </body>
     </html>

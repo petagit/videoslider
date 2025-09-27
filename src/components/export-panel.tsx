@@ -159,19 +159,19 @@ export function ExportPanel() {
   }, [exportBlocked, format, isExporting, runMp4Export]);
 
   return (
-    <section className="rounded-2xl border border-slate-800 bg-slate-900/60 p-5 shadow-lg shadow-slate-950/40">
+    <section className="rounded-2xl border border-slate-200 bg-white p-5 shadow-lg shadow-slate-200/60 transition-colors dark:border-slate-800 dark:bg-slate-900/60 dark:shadow-slate-950/40">
       <header className="mb-4">
-        <h2 className="text-sm font-semibold uppercase tracking-[0.2em] text-slate-300">
+        <h2 className="text-sm font-semibold uppercase tracking-[0.2em] text-slate-800 dark:text-slate-300">
           Export
         </h2>
-        <p className="text-xs text-slate-400">
+        <p className="text-xs text-slate-600 dark:text-slate-400">
           Render an MP4 via Remotion using the current slider, overlay, and animation settings.
         </p>
       </header>
 
       <div className="flex flex-col gap-4">
         <label className="flex flex-col gap-2">
-          <span className="text-[11px] font-semibold uppercase tracking-[0.25em] text-slate-500">
+          <span className="text-[11px] font-semibold uppercase tracking-[0.25em] text-slate-600 dark:text-slate-400">
             Background music (optional)
           </span>
           <input
@@ -193,22 +193,22 @@ export function ExportPanel() {
               };
               setAudio(audioPayload);
             }}
-            className="rounded-xl border border-slate-800 bg-slate-950/60 px-3 py-2 text-sm text-slate-100 focus:border-sky-400 focus:outline-none"
+            className="rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm text-slate-700 focus:border-sky-400 focus:outline-none dark:border-slate-700 dark:bg-slate-950/60 dark:text-slate-100"
           />
           {audio ? (
-            <span className="text-xs text-slate-400">{audio.name}</span>
+            <span className="text-xs text-slate-600 dark:text-slate-400">{audio.name}</span>
           ) : (
-            <span className="text-xs text-slate-500">MP3/WAV/M4A</span>
+            <span className="text-xs text-slate-500 dark:text-slate-400">MP3/WAV/M4A</span>
           )}
         </label>
         <label className="flex flex-col gap-2">
-          <span className="text-[11px] font-semibold uppercase tracking-[0.25em] text-slate-500">
+          <span className="text-[11px] font-semibold uppercase tracking-[0.25em] text-slate-600 dark:text-slate-400">
             Format
           </span>
           <select
             value={format}
             onChange={(event) => setExportFormat(event.target.value as typeof format)}
-            className="rounded-xl border border-slate-800 bg-slate-950/60 px-3 py-2 text-sm text-slate-100 focus:border-sky-400 focus:outline-none"
+            className="rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm text-slate-700 focus:border-sky-400 focus:outline-none dark:border-slate-700 dark:bg-slate-950/60 dark:text-slate-100"
           >
             <option value="mp4">MP4 (sequential cuts)</option>
             <option value="png">PNG (coming soon)</option>
@@ -218,7 +218,7 @@ export function ExportPanel() {
         </label>
 
         <label className="flex flex-col gap-2">
-          <span className="text-[11px] font-semibold uppercase tracking-[0.25em] text-slate-500">
+          <span className="text-[11px] font-semibold uppercase tracking-[0.25em] text-slate-600 dark:text-slate-400">
             Video length
           </span>
           <input
@@ -230,28 +230,28 @@ export function ExportPanel() {
             onChange={(event) => setAnimationDuration(Number(event.target.value) * 1000)}
             className="accent-sky-500"
           />
-          <span className="text-xs text-slate-300">{durationSeconds} second{durationSeconds === 1 ? "" : "s"}</span>
+          <span className="text-xs text-slate-600 dark:text-slate-300">{durationSeconds} second{durationSeconds === 1 ? "" : "s"}</span>
         </label>
 
         <button
           type="button"
           onClick={() => void handleExport()}
-          className="inline-flex items-center justify-center rounded-full bg-sky-500/10 px-4 py-2 text-[11px] font-semibold uppercase tracking-[0.3em] text-sky-100 shadow-inner shadow-sky-500/20 transition hover:bg-sky-500/20 disabled:cursor-not-allowed disabled:opacity-60"
+          className="inline-flex items-center justify-center rounded-full bg-sky-500/15 px-4 py-2 text-[11px] font-semibold uppercase tracking-[0.3em] text-sky-700 shadow-inner shadow-sky-500/20 transition hover:bg-sky-500/25 disabled:cursor-not-allowed disabled:opacity-60 dark:bg-sky-500/10 dark:text-sky-100 dark:hover:bg-sky-500/20"
           disabled={isExporting || exportBlocked}
         >
           {isExporting ? "Exporting…" : "Export preview"}
         </button>
 
         {exportBlocked ? (
-          <p className="rounded-xl border border-dashed border-amber-500/40 bg-amber-500/10 p-3 text-[11px] text-amber-200">
+          <p className="rounded-xl border border-dashed border-amber-500/40 bg-amber-500/10 p-3 text-[11px] text-amber-600 dark:text-amber-200">
             Add matching top and bottom photos for every pair to enable exporting.
           </p>
         ) : (
-          <p className="text-[11px] text-slate-400">{completePairCount} photo pair{completePairCount === 1 ? "" : "s"} will render sequentially.</p>
+          <p className="text-[11px] text-slate-600 dark:text-slate-400">{completePairCount} photo pair{completePairCount === 1 ? "" : "s"} will render sequentially.</p>
         )}
 
         {status ? (
-          <p className="rounded-xl border border-dashed border-slate-800 bg-slate-950/40 p-3 text-xs text-slate-300">
+          <p className="rounded-xl border border-dashed border-slate-300 bg-slate-100 p-3 text-xs text-slate-700 dark:border-slate-800 dark:bg-slate-950/40 dark:text-slate-300">
             {status}
           </p>
         ) : null}

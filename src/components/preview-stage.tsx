@@ -94,21 +94,21 @@ export function PreviewStage() {
   }), [textStroke]);
 
   return (
-    <div className="flex h-full flex-col gap-6 rounded-3xl border border-slate-800 bg-slate-900/70 p-6 shadow-[0_30px_80px_-40px_rgba(15,23,42,0.8)]">
+    <div className="flex h-full flex-col gap-6 rounded-3xl border border-slate-200 bg-white p-6 shadow-[0_30px_80px_-40px_rgba(15,23,42,0.25)] transition-colors dark:border-slate-800 dark:bg-slate-900/70 dark:shadow-[0_30px_80px_-40px_rgba(15,23,42,0.8)]">
       <header className="flex flex-col gap-2">
-        <p className="text-xs font-semibold uppercase tracking-[0.3em] text-slate-500">
+        <p className="text-xs font-semibold uppercase tracking-[0.3em] text-slate-500 dark:text-slate-400">
           Live Preview
         </p>
-        <h1 className="text-2xl font-semibold text-slate-100">
+        <h1 className="text-2xl font-semibold text-slate-900 dark:text-slate-100">
           Slider reveal prototype
         </h1>
-        <p className="text-sm text-slate-400">
+        <p className="text-sm text-slate-600 dark:text-slate-400">
           Drag the slider to test the mask. Drop your own images on the left to see this stage
           update instantly.
         </p>
-        <div className="mt-1 flex items-center gap-2 text-[11px] font-semibold uppercase tracking-[0.3em] text-slate-500">
+        <div className="mt-1 flex items-center gap-2 text-[11px] font-semibold uppercase tracking-[0.3em] text-slate-500 dark:text-slate-400">
           <span>Active pair</span>
-          <span className="rounded-full bg-slate-800 px-3 py-1 text-slate-200">
+          <span className="rounded-full bg-slate-200 px-3 py-1 text-slate-700 dark:bg-slate-800 dark:text-slate-200">
             {totalPairs > 0 ? `${Math.min(activePairIndex + 1, totalPairs)} / ${totalPairs}` : "—"}
           </span>
         </div>
@@ -117,7 +117,7 @@ export function PreviewStage() {
       <div className="relative w-full flex-1">
         <div
           id="preview-stage"
-          className="relative h-full w-full overflow-hidden rounded-2xl border border-slate-800 bg-[radial-gradient(circle_at_top,#1e293b_0%,#020617_70%)]"
+          className="relative h-full w-full overflow-hidden rounded-2xl border border-slate-200 bg-[radial-gradient(circle_at_top,#e2e8f0_0%,#f8fafc_70%)] transition-colors dark:border-slate-800 dark:bg-[radial-gradient(circle_at_top,#1e293b_0%,#020617_70%)]"
         >
           {bottomImage ? (
             <img
@@ -160,7 +160,7 @@ export function PreviewStage() {
                   {overlay.markdown}
                 </ReactMarkdown>
               ) : (
-                <p className="text-sm text-slate-400">
+                <p className="text-sm text-slate-600 dark:text-slate-400">
                   Start typing Markdown in the overlay panel to see it land here.
                 </p>
               )}
@@ -169,11 +169,11 @@ export function PreviewStage() {
         </div>
       </div>
 
-      <div className="flex items-center gap-4 rounded-2xl bg-slate-950/50 px-6 py-4">
+      <div className="flex items-center gap-4 rounded-2xl border border-slate-200 bg-slate-100/80 px-6 py-4 transition-colors dark:border-slate-800 dark:bg-slate-950/50">
         <div className="flex w-full flex-col gap-2">
-          <div className="flex items-center justify-between text-[11px] font-semibold uppercase tracking-[0.25em] text-slate-500">
+          <div className="flex items-center justify-between text-[11px] font-semibold uppercase tracking-[0.25em] text-slate-600 dark:text-slate-400">
             <span>Reveal percentage</span>
-            <span className="text-sky-200">{compare.sliderPct}%</span>
+            <span className="text-sky-600 dark:text-sky-200">{compare.sliderPct}%</span>
           </div>
           <input
             type="range"
@@ -184,7 +184,7 @@ export function PreviewStage() {
             className="accent-sky-500"
           />
         </div>
-        <div className="min-w-[120px] rounded-full border border-slate-800 bg-slate-900/60 px-4 py-2 text-center text-[11px] font-semibold uppercase tracking-[0.25em] text-slate-400">
+        <div className="min-w-[120px] rounded-full border border-slate-200 bg-slate-200/80 px-4 py-2 text-center text-[11px] font-semibold uppercase tracking-[0.25em] text-slate-600 transition-colors dark:border-slate-800 dark:bg-slate-900/60 dark:text-slate-300">
           {compare.orientation === "vertical" ? "Left ↔ Right" : "Top ↕ Bottom"}
         </div>
       </div>
@@ -201,13 +201,17 @@ interface PlaceholderProps {
 function Placeholder({ label, position, clipPath }: PlaceholderProps) {
   return (
     <div
-      className={`absolute inset-0 flex h-full w-full flex-col items-center justify-center gap-2 text-slate-600 ${position === "top" ? "bg-[radial-gradient(circle_at_top_left,#0f172a,#020617)]" : "bg-[radial-gradient(circle_at_bottom_right,#1e1b4b,#020617)]"}`}
+      className={`absolute inset-0 flex h-full w-full flex-col items-center justify-center gap-2 text-slate-500 transition-colors dark:text-slate-300 ${
+        position === "top"
+          ? "bg-[radial-gradient(circle_at_top_left,#dbeafe,#f8fafc)] dark:bg-[radial-gradient(circle_at_top_left,#0f172a,#020617)]"
+          : "bg-[radial-gradient(circle_at_bottom_right,#fce7f3,#f8fafc)] dark:bg-[radial-gradient(circle_at_bottom_right,#1e1b4b,#020617)]"
+      }`}
       style={position === "top" ? { clipPath } : undefined}
     >
       <svg
         aria-hidden
         viewBox="0 0 48 48"
-        className="h-10 w-10 text-slate-700"
+        className="h-10 w-10 text-slate-400 dark:text-slate-700"
       >
         <path
           fill="currentColor"
@@ -215,7 +219,7 @@ function Placeholder({ label, position, clipPath }: PlaceholderProps) {
         />
       </svg>
       <p className="text-xs font-semibold uppercase tracking-[0.3em]">{label}</p>
-      <p className="text-[11px] text-slate-500">Drop an image to replace this placeholder.</p>
+      <p className="text-[11px] text-slate-500 dark:text-slate-400">Drop an image to replace this placeholder.</p>
     </div>
   );
 }

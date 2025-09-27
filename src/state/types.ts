@@ -60,6 +60,8 @@ export interface AnimationSettings {
   direction: "forward" | "reverse" | "pingpong";
 }
 
+export type Theme = "light" | "dark";
+
 export interface VideoResolution {
   width: number;
   height: number;
@@ -81,4 +83,5 @@ export interface AppState {
   exportOptions: ExportOptions;
   animation: AnimationSettings;
   video: VideoExportOptions;
+  theme: Theme;
 }

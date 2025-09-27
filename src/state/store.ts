@@ -9,6 +9,7 @@ import type {
   PhotoPair,
   UploadedImage,
   VideoExportOptions,
+  Theme,
 } from "./types";
 
 const defaultOverlay: OverlayTextStyle = {
@@ -72,6 +73,8 @@ export interface AppStore extends AppState {
   setExportFormat: (format: ExportOptions["format"]) => void;
   setAudio: (audio: AppState["audio"]) => void;
   setAnimationDuration: (durationMs: number) => void;
+  setTheme: (theme: Theme) => void;
+  toggleTheme: () => void;
 }
 
 const generateId = () => {
@@ -110,6 +113,7 @@ export const useAppStore = create<AppStore>()(
       animation: defaultAnimation,
       video: defaultVideo,
       audio: undefined,
+      theme: "dark",
       setPhotoAt: (index, slot, image) =>
         set((state) => {
           const pair = state.photoPairs[index];
@@ -197,6 +201,10 @@ export const useAppStore = create<AppStore>()(
         set((state) => ({ exportOptions: { ...state.exportOptions, format } })),
       setAnimationDuration: (durationMs) =>
         set((state) => ({ animation: { ...state.animation, durationMs } })),
+      setTheme: (theme) =>
+        set(() => ({ theme })),
+      toggleTheme: () =>
+        set((state) => ({ theme: state.theme === "dark" ? "light" : "dark" })),
     }),
     {
       name: "video-editor-store",
