@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { readdir } from "node:fs/promises";
 import { basename, extname, join } from "node:path";
 
-const MUSIC_PRESET_DIR = join(process.cwd(), "public", "music-presets");
+const MUSIC_PRESET_DIR = join(process.cwd(), "public", "slideshow-music-library");
 const SUPPORTED_AUDIO_EXTENSIONS = new Set([".mp3", ".m4a", ".aac", ".wav", ".ogg", ".flac"]);
 
 interface PresetDescriptor {
@@ -27,7 +27,7 @@ export async function GET() {
           id: filename,
           name,
           filename,
-          url: `/music-presets/${encoded}`,
+          url: `/slideshow-music-library/${encoded}`,
         } satisfies PresetDescriptor;
       })
       .sort((a, b) => a.name.localeCompare(b.name, undefined, { sensitivity: "base" }));

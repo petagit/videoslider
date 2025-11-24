@@ -1,5 +1,6 @@
 import { Composition } from "remotion";
 import { SliderComposition, type SliderCompositionProps } from "./SliderComposition";
+import { SlideshowComposition } from "./SlideshowComposition";
 
 const defaultOverlay: SliderCompositionProps["overlay"] = {
   markdown: "## Overlay headline\nExplain your comparison with Markdown.",
@@ -23,20 +24,46 @@ const defaultAnimation: SliderCompositionProps["animation"] = {
 };
 
 export const RemotionRoot: React.FC = () => (
-  <Composition
-    id="slider-reveal"
-    component={SliderComposition}
-    // TikTok 9:16 portrait, safe zone 1080x1920
-    durationInFrames={Math.round((defaultAnimation.durationMs / 1000) * defaultAnimation.frameRate)}
-    fps={defaultAnimation.frameRate}
-    width={1080}
-    height={1920}
-    defaultProps={{
-      topImages: [""],
-      bottomImages: [""],
-      compare: { orientation: "vertical", showDivider: true },
-      overlay: defaultOverlay,
-      animation: defaultAnimation,
-    }}
-  />
+  <>
+    <Composition
+      id="slider-reveal"
+      component={SliderComposition}
+      // TikTok 9:16 portrait, safe zone 1080x1920
+      durationInFrames={Math.round((defaultAnimation.durationMs / 1000) * defaultAnimation.frameRate)}
+      fps={defaultAnimation.frameRate}
+      width={1080}
+      height={1920}
+      defaultProps={{
+        topImages: [""],
+        bottomImages: [""],
+        compare: { orientation: "vertical", showDivider: true },
+        overlay: defaultOverlay,
+        animation: defaultAnimation,
+      }}
+    />
+    <Composition
+      id="slideshow"
+      component={SlideshowComposition}
+      durationInFrames={30 * 5} // Default placeholder duration
+      fps={30}
+      width={1080}
+      height={1920}
+      defaultProps={{
+        images: [],
+        durationPerSlide: 1.5,
+      }}
+      calculateMetadata={({ props }: { props: import("./SlideshowComposition").SlideshowCompositionProps }) => {
+        const fps = 30;
+        const durationPerSlide = props.durationPerSlide ?? 1.5;
+        const count = props.images?.length ?? 0;
+        
+        const durationInFrames = Math.round(count * durationPerSlide * fps);
+
+        return {
+          durationInFrames: count === 0 ? 30 : durationInFrames,
+          fps,
+        };
+      }}
+    />
+  </>
 );

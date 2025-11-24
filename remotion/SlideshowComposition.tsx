@@ -1,0 +1,127 @@
+import React, { useEffect, useState } from "react";
+import {
+    AbsoluteFill,
+    Img,
+    Sequence,
+    useVideoConfig,
+    delayRender,
+    continueRender,
+    Audio,
+    staticFile,
+} from "remotion";
+
+export interface SlideshowCompositionProps {
+    images: string[];
+    durationPerSlide: number; // in seconds
+    audio?: string;
+}
+
+export const SlideshowComposition: React.FC<SlideshowCompositionProps> = ({
+    images,
+    durationPerSlide,
+    audio,
+}) => {
+    const { fps } = useVideoConfig();
+
+    if (!images || images.length === 0) {
+        return (
+            <AbsoluteFill
+                style={{
+                    justifyContent: "center",
+                    alignItems: "center",
+                    backgroundColor: "black",
+                    color: "white",
+                    fontSize: 40,
+                }}
+            >
+                No images provided
+            </AbsoluteFill>
+        );
+    }
+
+    const durationInFrames = Math.round(durationPerSlide * fps);
+    // Use the local file as the shutter sound effect
+    const shutterSound = staticFile("/fnv-slideshow.mp3");
+
+    return (
+        <AbsoluteFill style={{ backgroundColor: "black" }}>
+            {audio && <Audio src={audio} />}
+            {images.map((image, index) => {
+                const from = index * durationInFrames;
+                return (
+                    <React.Fragment key={index}>
+                        {/* Play shutter sound at the start of each slide transition (except maybe the first one if desired, but here we play for all) */}
+                        <Sequence from={from} durationInFrames={durationInFrames}>
+                           <Audio src={shutterSound} />
+                        </Sequence>
+
+                        <Sequence
+                            from={from}
+                            durationInFrames={durationInFrames}
+                        >
+                            <Slide src={image} />
+                        </Sequence>
+                    </React.Fragment>
+                );
+            })}
+        </AbsoluteFill>
+    );
+};
+
+const Slide: React.FC<{
+    src: string;
+}> = ({ src }) => {
+    const [backgroundColor, setBackgroundColor] = useState("black");
+    const [handle] = useState(() => delayRender());
+
+    useEffect(() => {
+        let mounted = true;
+        const getColor = async () => {
+            try {
+                const img = new Image();
+                img.crossOrigin = "Anonymous";
+                img.src = src;
+                
+                await new Promise((resolve, reject) => {
+                    img.onload = resolve;
+                    img.onerror = reject;
+                });
+
+                if (!mounted) return;
+
+                const canvas = document.createElement("canvas");
+                canvas.width = 1;
+                canvas.height = 1;
+                const ctx = canvas.getContext("2d");
+                if (ctx) {
+                    ctx.drawImage(img, 0, 0, 1, 1);
+                    const [r, g, b] = ctx.getImageData(0, 0, 1, 1).data;
+                    setBackgroundColor(`rgb(${r}, ${g}, ${b})`);
+                }
+            } catch (e) {
+                console.error("Failed to extract color", e);
+            } finally {
+                if (mounted) continueRender(handle);
+            }
+        };
+        
+        getColor();
+
+        return () => {
+            mounted = false;
+        };
+    }, [handle, src]);
+
+    return (
+        <AbsoluteFill style={{ backgroundColor }}>
+            <Img
+                src={src}
+                style={{
+                    width: "100%",
+                    height: "100%",
+                    objectFit: "contain",
+                }}
+            />
+        </AbsoluteFill>
+    );
+};

@@ -5,32 +5,69 @@ const os = require('node:os');
 const fs = require('node:fs/promises');
 
 async function main() {
-  const [payloadPath, fileName] = process.argv.slice(2);
+  const [payloadPath, fileName, compositionId = 'slider-reveal'] = process.argv.slice(2);
   if (!payloadPath || !fileName) {
-    console.error('Usage: render <payload.json> <output-file-name>');
+    console.error('Usage: render <payload.json> <output-file-name> [composition-id]');
     process.exit(2);
   }
 
   const payload = JSON.parse(await fs.readFile(payloadPath, 'utf-8'));
   const audioDataUrl = payload.audio;
-  const { topImages = [], bottomImages = [], animation } = payload;
 
-  if (!Array.isArray(topImages) || !Array.isArray(bottomImages)) {
-    throw new Error('Expected photo arrays in payload.');
+  // Validation logic specific to slider-reveal
+  if (compositionId === 'slider-reveal') {
+    const { topImages = [], bottomImages = [] } = payload;
+    if (!Array.isArray(topImages) || !Array.isArray(bottomImages)) {
+      throw new Error('Expected photo arrays in payload.');
+    }
+
+    if (topImages.length !== bottomImages.length) {
+      throw new Error('Top and bottom photo counts must match.');
+    }
+
+    if (topImages.length === 0) {
+      throw new Error('Add at least one photo pair before rendering.');
+    }
+  } else if (compositionId === 'slideshow') {
+    const { images = [] } = payload;
+    if (!Array.isArray(images) || images.length === 0) {
+      throw new Error('No images provided for slideshow');
+    }
   }
 
-  if (topImages.length !== bottomImages.length) {
-    throw new Error('Top and bottom photo counts must match.');
-  }
+  // Generic props handling
+  const frameRate = payload.animation?.frameRate ?? 30;
+  // For slider-reveal, we calculate duration based on animation props
+  // For slideshow, it might be calculated differently or passed in. 
+  // But Remotion's calculateMetadata in Root.tsx should handle the duration if we pass the right props.
+  // However, we need to override durationInFrames here if we want to be explicit, 
+  // OR we can rely on calculateMetadata if we don't set it here?
+  // renderMedia uses the composition's duration if not specified.
+  // But the original code calculated totalFrames manually.
 
-  if (topImages.length === 0) {
-    throw new Error('Add at least one photo pair before rendering.');
-  }
+  // Let's keep the manual calculation for slider-reveal for backward compatibility
+  let durationInFrames = undefined;
 
-  const frameRate = animation?.frameRate ?? 30;
-  const durationMs = animation?.durationMs ?? 3000;
-  const framesPerSegment = Math.max(1, Math.round((durationMs / 1000) * frameRate));
-  const totalFrames = framesPerSegment * topImages.length;
+  if (compositionId === 'slider-reveal') {
+    const { topImages = [], animation } = payload;
+    const durationMs = animation?.durationMs ?? 3000;
+    const framesPerSegment = Math.max(1, Math.round((durationMs / 1000) * frameRate));
+    durationInFrames = framesPerSegment * topImages.length;
+  } else if (compositionId === 'slideshow') {
+    // Calculate duration for slideshow based on payload
+    // Total duration = N * D (no overlap/transition)
+    
+    const { images = [], durationPerSlide = 1.5 } = payload;
+    const count = images.length;
+    durationInFrames = Math.round(count * durationPerSlide * frameRate);
+    if (count === 0) durationInFrames = 30;
+  }
+  // For slideshow, we let calculateMetadata handle it or calculate it here?
+  // If we don't set durationInFrames in composition object passed to renderMedia, it uses the default from Root.tsx.
+  // But Root.tsx has calculateMetadata which should run.
+  // However, getCompositions returns the default metadata.
+  // To get dynamic metadata based on props, we might need to use selectComposition or just pass props and let Remotion handle it?
+  // renderMedia accepts `composition` object. If we modify it, we set the duration.
 
   // Require here so Next.js doesn't try to bundle these modules
   const { bundle } = require('@remotion/bundler');
@@ -41,10 +78,12 @@ async function main() {
 
   const bundleLocation = await bundle({ entryPoint, outDir: undefined });
 
-  const compositions = await getCompositions(bundleLocation);
-  const base = compositions.find((c) => c.id === 'slider-reveal');
+  const compositions = await getCompositions(bundleLocation, {
+    inputProps: payload, // Pass props to getCompositions to trigger calculateMetadata?
+  });
+  const base = compositions.find((c) => c.id === compositionId);
   if (!base) {
-    throw new Error('Composition "slider-reveal" not found');
+    throw new Error(`Composition "${compositionId}" not found`);
   }
 
   const tmpDir = await fs.mkdtemp(path.join(os.tmpdir(), 'slider-render-'));
@@ -52,10 +91,13 @@ async function main() {
 
   const composition = {
     ...base,
-    durationInFrames: totalFrames,
     fps: frameRate,
     props: { ...payload, audio: audioDataUrl },
   };
+
+  if (durationInFrames) {
+    composition.durationInFrames = durationInFrames;
+  }
 
   await renderMedia({
     serveUrl: bundleLocation,

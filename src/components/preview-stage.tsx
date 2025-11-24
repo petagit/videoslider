@@ -1,18 +1,22 @@
 /* eslint-disable @next/next/no-img-element */
 "use client";
 
-import { CSSProperties, useEffect, useMemo } from "react";
+import { CSSProperties, useEffect, useMemo, useState, useRef } from "react";
 import { motion, useMotionTemplate, useSpring, useTransform } from "motion/react";
 import ReactMarkdown, { type Components as MarkdownComponents } from "react-markdown";
 import remarkGfm from "remark-gfm";
 import { useAppStore } from "../state/store";
 
 export function PreviewStage() {
+  const [isEditing, setIsEditing] = useState<boolean>(false);
+  const [editValue, setEditValue] = useState<string>("");
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
   const photoPairs = useAppStore((state) => state.photoPairs);
   const activePairIndex = useAppStore((state) => state.activePairIndex);
   const compare = useAppStore((state) => state.compare);
   const overlay = useAppStore((state) => state.overlay);
   const setSliderPct = useAppStore((state) => state.setSliderPct);
+  const setOverlayMarkdown = useAppStore((state) => state.setOverlayMarkdown);
 
   const activePair = photoPairs[activePairIndex] ?? photoPairs[0];
   const topImage = activePair?.top;
@@ -39,6 +43,37 @@ export function PreviewStage() {
   }, [compare.orientation, compare.sliderPct]);
 
   const dividerPosition = useTransform(sliderSpring, (value) => `${value}%`);
+
+  const handleDoubleClick = () => {
+    setEditValue(overlay.markdown);
+    setIsEditing(true);
+  };
+
+  const handleSave = () => {
+    setOverlayMarkdown(editValue);
+    setIsEditing(false);
+  };
+
+  const handleCancel = () => {
+    setEditValue(overlay.markdown);
+    setIsEditing(false);
+  };
+
+  const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
+    if (e.key === "Escape") {
+      handleCancel();
+    } else if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) {
+      e.preventDefault();
+      handleSave();
+    }
+  };
+
+  useEffect(() => {
+    if (isEditing && textareaRef.current) {
+      textareaRef.current.focus();
+      textareaRef.current.select();
+    }
+  }, [isEditing]);
 
   const overlayStyles = useMemo<CSSProperties>(() => {
     const base: CSSProperties = {
@@ -94,30 +129,21 @@ export function PreviewStage() {
   }), [textStroke]);
 
   return (
-    <div className="flex h-full flex-col gap-6 rounded-3xl border border-slate-200 bg-white p-6 shadow-[0_30px_80px_-40px_rgba(15,23,42,0.25)] transition-colors dark:border-slate-800 dark:bg-slate-900/70 dark:shadow-[0_30px_80px_-40px_rgba(15,23,42,0.8)]">
-      <header className="flex flex-col gap-2">
-        <p className="text-xs font-semibold uppercase tracking-[0.3em] text-slate-500 dark:text-slate-400">
-          Live Preview
-        </p>
-        <h1 className="text-2xl font-semibold text-slate-900 dark:text-slate-100">
-          Slider reveal prototype
-        </h1>
-        <p className="text-sm text-slate-600 dark:text-slate-400">
-          Drag the slider to test the mask. Drop your own images on the left to see this stage
-          update instantly.
-        </p>
-        <div className="mt-1 flex items-center gap-2 text-[11px] font-semibold uppercase tracking-[0.3em] text-slate-500 dark:text-slate-400">
-          <span>Active pair</span>
-          <span className="rounded-full bg-slate-200 px-3 py-1 text-slate-700 dark:bg-slate-800 dark:text-slate-200">
+    <div className="flex h-full flex-col gap-4 overflow-hidden bg-white p-4 transition-colors dark:bg-slate-900">
+      <header className="flex shrink-0 items-center justify-between gap-4">
+        <div className="flex items-center gap-3">
+          <h1 className="text-lg font-semibold text-slate-900 dark:text-slate-100">Live Preview</h1>
+          <span className="rounded-full bg-slate-200 px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.3em] text-slate-700 dark:bg-slate-800 dark:text-slate-200">
             {totalPairs > 0 ? `${Math.min(activePairIndex + 1, totalPairs)} / ${totalPairs}` : "—"}
           </span>
         </div>
       </header>
 
-      <div className="relative w-full flex-1">
+      <div className="relative flex flex-1 items-center justify-center overflow-hidden p-2">
         <div
           id="preview-stage"
-          className="relative h-full w-full overflow-hidden rounded-2xl border border-slate-200 bg-[radial-gradient(circle_at_top,#e2e8f0_0%,#f8fafc_70%)] transition-colors dark:border-slate-800 dark:bg-[radial-gradient(circle_at_top,#1e293b_0%,#020617_70%)]"
+          className="relative w-full max-w-full overflow-hidden rounded-xl border border-slate-200 bg-[radial-gradient(circle_at_top,#e2e8f0_0%,#f8fafc_70%)] transition-colors dark:border-slate-800 dark:bg-[radial-gradient(circle_at_top,#1e293b_0%,#020617_70%)]"
+          style={{ aspectRatio: "9/16", maxHeight: "100%" }}
         >
           {bottomImage ? (
             <img
@@ -153,26 +179,66 @@ export function PreviewStage() {
             }
           />
 
-          <div className="pointer-events-none absolute inset-0 flex items-center justify-center p-10">
-            <div style={overlayStyles} className="markdown-preview">
-              {overlay.markdown.trim() ? (
-                <ReactMarkdown remarkPlugins={[remarkGfm]} components={components}>
-                  {overlay.markdown}
-                </ReactMarkdown>
-              ) : (
-                <p className="text-sm text-slate-600 dark:text-slate-400">
-                  Start typing Markdown in the overlay panel to see it land here.
-                </p>
-              )}
-            </div>
+          <div className="absolute inset-0 flex items-center justify-center p-10">
+            {isEditing ? (
+              <div style={overlayStyles} className="markdown-preview w-full">
+                <textarea
+                  ref={textareaRef}
+                  value={editValue}
+                  onChange={(e) => setEditValue(e.target.value)}
+                  onBlur={handleSave}
+                  onKeyDown={handleKeyDown}
+                  className="w-full resize-none rounded-lg border-2 border-sky-400 bg-white p-3 text-sm text-slate-700 shadow-lg focus:outline-none focus:ring-2 focus:ring-sky-500 dark:bg-slate-900 dark:text-slate-100"
+                  style={{
+                    fontSize: "14px",
+                    fontFamily: overlay.fontFamily,
+                    minHeight: "120px",
+                    lineHeight: "1.5",
+                  }}
+                  placeholder="Edit markdown..."
+                />
+                <div className="mt-2 flex items-center justify-end gap-2 text-xs text-slate-500 dark:text-slate-400">
+                  <span>Press Esc to cancel</span>
+                  <span>•</span>
+                  <span>Ctrl/Cmd + Enter to save</span>
+                </div>
+              </div>
+            ) : (
+              <div
+                style={overlayStyles}
+                className="markdown-preview cursor-pointer transition-opacity hover:opacity-90"
+                onClick={() => {
+                  const textarea = document.getElementById("markdown-textarea");
+                  if (textarea) {
+                    textarea.focus();
+                    textarea.scrollIntoView({ behavior: "smooth", block: "center" });
+                  }
+                }}
+                onDoubleClick={handleDoubleClick}
+                onMouseDown={(e) => {
+                  // Prevent slider interaction when clicking text
+                  e.stopPropagation();
+                }}
+              >
+                {overlay.markdown.trim() ? (
+                  <ReactMarkdown remarkPlugins={[remarkGfm]} components={components}>
+                    {overlay.markdown}
+                  </ReactMarkdown>
+                ) : (
+                  <p className="text-sm text-slate-600 dark:text-slate-400">
+                    Start typing Markdown in the overlay panel to see it land here.
+                  </p>
+                )}
+              </div>
+            )}
           </div>
         </div>
       </div>
 
-      <div className="flex items-center gap-4 rounded-2xl border border-slate-200 bg-slate-100/80 px-6 py-4 transition-colors dark:border-slate-800 dark:bg-slate-950/50">
-        <div className="flex w-full flex-col gap-2">
+      <div className="flex shrink-0 items-center gap-4 rounded-xl border border-slate-200 bg-slate-100/80 px-4 py-3 transition-colors dark:border-slate-800 dark:bg-slate-950/50">
+        <div className="flex w-full flex-col gap-1.5">
           <div className="flex items-center justify-between text-[11px] font-semibold uppercase tracking-[0.25em] text-slate-600 dark:text-slate-400">
-            <span>Reveal percentage</span>
+            <span>Reveal</span>
             <span className="text-sky-600 dark:text-sky-200">{compare.sliderPct}%</span>
           </div>
           <input
@@ -184,8 +250,8 @@ export function PreviewStage() {
             className="accent-sky-500"
           />
         </div>
-        <div className="min-w-[120px] rounded-full border border-slate-200 bg-slate-200/80 px-4 py-2 text-center text-[11px] font-semibold uppercase tracking-[0.25em] text-slate-600 transition-colors dark:border-slate-800 dark:bg-slate-900/60 dark:text-slate-300">
-          {compare.orientation === "vertical" ? "Left ↔ Right" : "Top ↕ Bottom"}
+        <div className="min-w-[100px] rounded-full border border-slate-200 bg-slate-200/80 px-3 py-1.5 text-center text-[11px] font-semibold uppercase tracking-[0.25em] text-slate-600 transition-colors dark:border-slate-800 dark:bg-slate-900/60 dark:text-slate-300">
+          {compare.orientation === "vertical" ? "↔" : "↕"}
         </div>
       </div>
     </div>

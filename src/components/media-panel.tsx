@@ -1,7 +1,7 @@
 /* eslint-disable @next/next/no-img-element */
 "use client";
 
-import { ChangeEvent, DragEvent, MouseEvent, useCallback, useEffect, useMemo, useState } from "react";
+import { ChangeEvent, DragEvent, MouseEvent, useCallback, useMemo, useState } from "react";
 import { useAppStore } from "../state/store";
 import type { UploadedImage } from "../state/types";
 
@@ -14,13 +14,6 @@ type SlotKind = "top" | "bottom";
 interface DragTarget {
   pairIndex: number;
   slot: SlotKind;
-}
-
-interface MusicPreset {
-  id: string;
-  name: string;
-  filename: string;
-  url: string;
 }
 
 const loadImageDimensions = async (src: string) =>
@@ -63,7 +56,6 @@ export function MediaPanel() {
   const photoPairs = useAppStore((state) => state.photoPairs);
   const activePairIndex = useAppStore((state) => state.activePairIndex);
   const compare = useAppStore((state) => state.compare);
-  const audio = useAppStore((state) => state.audio);
   const setPhotoAt = useAppStore((state) => state.setPhotoAt);
   const addPhotoPair = useAppStore((state) => state.addPhotoPair);
   const removePhotoPair = useAppStore((state) => state.removePhotoPair);
@@ -71,13 +63,9 @@ export function MediaPanel() {
   const clearImages = useAppStore((state) => state.clearImages);
   const setOrientation = useAppStore((state) => state.setOrientation);
   const toggleDivider = useAppStore((state) => state.toggleDivider);
-  const setAudio = useAppStore((state) => state.setAudio);
 
   const [dragTarget, setDragTarget] = useState<DragTarget | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
-  const [musicPresets, setMusicPresets] = useState<MusicPreset[]>([]);
-  const [isLoadingPresets, setIsLoadingPresets] = useState(false);
-  const [presetError, setPresetError] = useState<string | null>(null);
 
   const displayPairs = useMemo(() => photoPairs.slice(0, MAX_PAIRS), [photoPairs]);
   const canAddPair = photoPairs.length < MAX_PAIRS;
@@ -87,47 +75,6 @@ export function MediaPanel() {
   );
   const truncatedPairCount = Math.max(0, photoPairs.length - displayPairs.length);
   const activePairNumber = photoPairs.length > 0 ? Math.min(activePairIndex, photoPairs.length - 1) + 1 : 1;
-
-  const fetchMusicPresets = useCallback(
-    async (signal?: AbortSignal) => {
-      setIsLoadingPresets(true);
-      try {
-        const response = await fetch("/api/music-presets", { signal });
-        if (!response?.ok) {
-          throw new Error("Failed to load music presets.");
-        }
-        const payload = (await response.json()) as { presets?: MusicPreset[] };
-        if (signal?.aborted) {
-          return;
-        }
-        setMusicPresets(payload.presets ?? []);
-        setPresetError(null);
-      } catch (error) {
-        if ((error as Error)?.name === "AbortError") {
-          return;
-        }
-        console.error("Failed to load music presets", error);
-        setMusicPresets([]);
-        setPresetError("Unable to load music presets. Add files to public/music-presets.");
-      } finally {
-        if (!signal?.aborted) {
-          setIsLoadingPresets(false);
-        }
-      }
-    },
-    [],
-  );
-
-  useEffect(() => {
-    if (!isModalOpen) {
-      return;
-    }
-
-    const controller = new AbortController();
-    void fetchMusicPresets(controller.signal);
-
-    return () => controller.abort();
-  }, [fetchMusicPresets, isModalOpen]);
 
   const assignImage = useCallback(
     async (pairIndex: number, slot: SlotKind, file?: File) => {
@@ -174,22 +121,6 @@ export function MediaPanel() {
     },
     [setPhotoAt],
   );
-
-  const handleSelectPreset = useCallback(
-    (preset: MusicPreset) => {
-      setAudio({
-        id: `preset-${preset.id}`,
-        src: preset.url,
-        name: preset.name,
-        origin: "preset",
-      });
-    },
-    [setAudio],
-  );
-
-  const clearAudioSelection = useCallback(() => {
-    setAudio(undefined);
-  }, [setAudio]);
 
   const hasIncompletePair = useMemo(
     () => photoPairs.some((pair) => !pair.top || !pair.bottom),
@@ -332,63 +263,6 @@ const mediaModal = !isModalOpen
                   })}
                 </div>
 
-                <div className="space-y-2.5">
-                  <span className="text-[9px] font-semibold uppercase tracking-[0.25em] text-slate-500 dark:text-slate-400">
-                    Music library
-                  </span>
-                  <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-                    {isLoadingPresets ? (
-                      <div className="col-span-full rounded-xl border border-dashed border-slate-300 bg-slate-100 p-4 text-center text-[11px] text-slate-600 dark:border-slate-800 dark:bg-slate-950/50 dark:text-slate-400">
-                        Loading presets…
-                      </div>
-                    ) : musicPresets.length > 0 ? (
-                      musicPresets.map((preset) => {
-                        const isSelected = audio?.origin === "preset" && audio?.id === `preset-${preset.id}`;
-                        return (
-                          <button
-                            key={preset.id}
-                            type="button"
-                            onClick={() => handleSelectPreset(preset)}
-                            className={`relative flex aspect-square w-full items-center justify-center rounded-xl border border-dashed px-3 text-center text-xs font-semibold uppercase tracking-[0.25em] transition-colors ${
-                              isSelected
-                                ? "border-sky-400 bg-sky-500/20 text-sky-700 dark:text-sky-100"
-                                : "border-slate-300 bg-white text-slate-600 hover:border-slate-400 hover:text-slate-800 dark:border-slate-700 dark:bg-slate-950/70 dark:text-slate-300 dark:hover:border-slate-500 dark:hover:text-slate-100"
-                            }`}
-                          >
-                            <span className="line-clamp-2">{preset.name}</span>
-                          </button>
-                        );
-                      })
-                    ) : (
-                      <div className="col-span-full rounded-xl border border-dashed border-slate-300 bg-slate-100 p-4 text-center text-[11px] text-slate-600 dark:border-slate-800 dark:bg-slate-950/50 dark:text-slate-400">
-                        Drop audio files into <code className="font-mono text-slate-500 dark:text-slate-300">public/music-presets</code> and reopen this modal.
-                      </div>
-                    )}
-                  </div>
-                  {presetError ? (
-                    <p className="text-[11px] text-rose-300">{presetError}</p>
-                  ) : (
-                    <p className="text-[11px] text-slate-500 dark:text-slate-400">
-                      MP3, WAV, AAC, OGG, or FLAC files placed in <code className="font-mono text-slate-500 dark:text-slate-300">public/music-presets</code> will appear here.
-                    </p>
-                  )}
-                  {audio ? (
-                    <div className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-slate-300 bg-slate-100 px-3 py-2 text-xs text-slate-600 transition-colors dark:border-slate-800 dark:bg-slate-950/60 dark:text-slate-200">
-                      <span className="truncate">
-                        {audio.origin === "preset" ? `Preset selected: ${audio.name}` : `Uploaded track: ${audio.name}`}
-                      </span>
-                      <button
-                        type="button"
-                        onClick={clearAudioSelection}
-                        className="rounded-full border border-slate-300 px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.25em] text-slate-600 transition hover:border-slate-400 hover:text-slate-800 dark:border-slate-700 dark:text-slate-300 dark:hover:border-slate-500 dark:hover:text-white"
-                      >
-                        Remove audio
-                      </button>
-                    </div>
-                  ) : (
-                    <p className="text-[11px] text-slate-500 dark:text-slate-400">No music selected.</p>
-                  )}
-                </div>
 
                 <div className="flex flex-wrap items-center justify-between gap-3">
                   <div className="flex flex-wrap gap-2">
@@ -446,11 +320,11 @@ const mediaModal = !isModalOpen
       );
 
   return (
-    <section className="rounded-2xl border border-slate-200 bg-white p-5 shadow-lg shadow-slate-200/60 transition-colors dark:border-slate-800 dark:bg-slate-900/60 dark:shadow-slate-950/40">
-      <header className="mb-4 flex flex-wrap items-center justify-between gap-3">
+    <section className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm transition-colors dark:border-slate-800 dark:bg-slate-900/60">
+      <header className="mb-3 flex flex-wrap items-center justify-between gap-2">
         <div>
-          <h2 className="text-sm font-semibold uppercase tracking-[0.2em] text-slate-800 dark:text-slate-300">Media</h2>
-          <p className="text-xs text-slate-600 dark:text-slate-400">Upload matching photo pairs to build sequential cuts.</p>
+          <h2 className="text-xs font-semibold uppercase tracking-[0.2em] text-slate-800 dark:text-slate-300">Media</h2>
+          <p className="text-[11px] text-slate-600 dark:text-slate-400">Upload photo pairs.</p>
         </div>
         <div className="flex items-center gap-2">
           <button
@@ -470,19 +344,13 @@ const mediaModal = !isModalOpen
         </div>
       </header>
 
-      <div className="rounded-xl border border-slate-200 bg-slate-50 p-4 transition-colors dark:border-slate-800 dark:bg-slate-950/40">
-        <div className="flex flex-col gap-2">
-          <p className="text-xs text-slate-600 dark:text-slate-300">
-            {readyPairCount} of {photoPairs.length} pair{photoPairs.length === 1 ? "" : "s"} ready for preview.
-          </p>
-          <p className="text-[11px] text-slate-600 dark:text-slate-400">Active pair {activePairNumber}</p>
-          {truncatedPairCount > 0 ? (
-            <p className="text-[11px] text-amber-600 dark:text-amber-300">
-              Showing the first {MAX_PAIRS} pairs. Remove extras to edit additional uploads.
-            </p>
-          ) : null}
+      <div className="rounded-lg border border-slate-200 bg-slate-50 p-3 transition-colors dark:border-slate-800 dark:bg-slate-950/40">
+        <div className="mb-2 flex items-center gap-2 text-[11px] text-slate-600 dark:text-slate-300">
+          <span>{readyPairCount}/{photoPairs.length} ready</span>
+          <span className="text-slate-400">•</span>
+          <span>Pair {activePairNumber}</span>
         </div>
-        <div className="mt-3 flex flex-wrap gap-2">
+        <div className="flex flex-wrap gap-2">
           {photoPairs.map((pair, index) => {
             const isActive = activePairIndex === index;
             const isComplete = Boolean(pair.top && pair.bottom);
