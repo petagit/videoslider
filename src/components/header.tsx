@@ -10,7 +10,7 @@ export function Header() {
   const isActive = (path: string) => pathname === path;
 
   return (
-    <header className="flex h-14 shrink-0 items-center justify-between border-b border-slate-200 bg-slate-50 px-4 dark:border-slate-800 dark:bg-slate-950">
+    <header className="sticky top-0 z-50 flex h-14 shrink-0 items-center justify-between border-b border-slate-200/70 bg-slate-50/70 px-4 backdrop-blur-md dark:border-slate-800/70 dark:bg-slate-950/70">
       <div className="flex items-center gap-6">
         <Link href="/" className="font-bold text-slate-900 dark:text-slate-100">
           Video Editor
@@ -18,21 +18,19 @@ export function Header() {
         <nav className="flex gap-4">
           <Link
             href="/"
-            className={`text-sm font-medium transition-colors ${
-              isActive("/") 
-                ? "text-indigo-600 dark:text-indigo-400" 
+            className={`text-sm font-medium transition-colors ${isActive("/")
+                ? "text-indigo-600 dark:text-indigo-400"
                 : "text-slate-600 hover:text-indigo-600 dark:text-slate-400 dark:hover:text-indigo-400"
-            }`}
+              }`}
           >
             Slider Reveal
           </Link>
           <Link
             href="/slideshow"
-            className={`text-sm font-medium transition-colors ${
-              isActive("/slideshow")
+            className={`text-sm font-medium transition-colors ${isActive("/slideshow")
                 ? "text-indigo-600 dark:text-indigo-400"
                 : "text-slate-600 hover:text-indigo-600 dark:text-slate-400 dark:hover:text-indigo-400"
-            }`}
+              }`}
           >
             Slideshow Generator
           </Link>
