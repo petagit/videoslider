@@ -1,7 +1,7 @@
 /* eslint-disable @next/next/no-img-element */
 "use client";
 
-import { ChangeEvent, DragEvent, MouseEvent, useCallback, useMemo, useState } from "react";
+import { ChangeEvent, DragEvent, MouseEvent, useCallback, useEffect, useMemo, useState } from "react";
 import { useAppStore } from "../state/store";
 import type { UploadedImage } from "../state/types";
 
@@ -146,199 +146,242 @@ export function MediaPanel() {
     [photoPairs],
   );
 
-const mediaModal = !isModalOpen
+  // Handle paste events
+  useEffect(() => {
+    const handlePaste = async (event: ClipboardEvent) => {
+      const items = Array.from(event.clipboardData?.items ?? []);
+      const imageFiles = items
+        .filter((item) => item.type.startsWith("image/"))
+        .map((item) => item.getAsFile())
+        .filter((file): file is File => file !== null);
+
+      if (imageFiles.length === 0) return;
+
+      event.preventDefault();
+
+      // Find the first empty slot
+      let startPairIndex = 0;
+      let startSlot: SlotKind = "top";
+      let foundEmpty = false;
+
+      const currentPairs = useAppStore.getState().photoPairs;
+
+      for (let i = 0; i < currentPairs.length; i++) {
+        if (!currentPairs[i].top) {
+          startPairIndex = i;
+          startSlot = "top";
+          foundEmpty = true;
+          break;
+        }
+        if (!currentPairs[i].bottom) {
+          startPairIndex = i;
+          startSlot = "bottom";
+          foundEmpty = true;
+          break;
+        }
+      }
+
+      // If no empty slot found in existing pairs, start at the next new pair
+      if (!foundEmpty) {
+        startPairIndex = currentPairs.length;
+        startSlot = "top";
+      }
+
+      await assignImages(startPairIndex, startSlot, imageFiles);
+    };
+
+    window.addEventListener("paste", handlePaste);
+    return () => window.removeEventListener("paste", handlePaste);
+  }, [assignImages]);
+
+  const mediaModal = !isModalOpen
     ? null
     : (
+      <div
+        className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 px-4 py-6 backdrop-blur-sm transition-colors dark:bg-slate-950/80"
+        role="dialog"
+        aria-modal="true"
+        onClick={() => setIsModalOpen(false)}
+      >
         <div
-          className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 px-4 py-6 backdrop-blur-sm transition-colors dark:bg-slate-950/80"
-          role="dialog"
-          aria-modal="true"
-          onClick={() => setIsModalOpen(false)}
+          className="relative w-full max-w-3xl overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-2xl shadow-slate-200/50 transition-colors dark:border-slate-800 dark:bg-slate-900 dark:shadow-slate-950/40"
+          onClick={(event) => event.stopPropagation()}
         >
-          <div
-            className="relative w-full max-w-3xl overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-2xl shadow-slate-200/50 transition-colors dark:border-slate-800 dark:bg-slate-900 dark:shadow-slate-950/40"
-            onClick={(event) => event.stopPropagation()}
-          >
-            <div className="px-5 py-5 sm:px-6">
-              <div className="mb-5 flex flex-wrap items-start justify-between gap-3">
-                <div className="flex flex-col gap-1 pr-4">
-                  <h3 className="text-sm font-semibold uppercase tracking-[0.2em] text-slate-900 dark:text-slate-200">Media uploader</h3>
-                  <p className="text-xs text-slate-600 dark:text-slate-400">
-                    Drag and drop images into each slot or browse from your computer. You can add up to four photo pairs.
-                  </p>
-                </div>
-                <button
-                  type="button"
-                  onClick={() => setIsModalOpen(false)}
-                  className="shrink-0 rounded-full border border-slate-300 px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.25em] text-slate-600 transition hover:border-slate-400 hover:text-slate-800 dark:border-slate-700 dark:text-slate-300 dark:hover:border-slate-500 dark:hover:text-white"
-                >
-                  Close
-                </button>
+          <div className="px-5 py-5 sm:px-6">
+            <div className="mb-5 flex flex-wrap items-start justify-between gap-3">
+              <div className="flex flex-col gap-1 pr-4">
+                <h3 className="text-sm font-semibold uppercase tracking-[0.2em] text-slate-900 dark:text-slate-200">Media uploader</h3>
+                <p className="text-xs text-slate-600 dark:text-slate-400">
+                  Drag and drop images into each slot or browse from your computer. You can add up to four photo pairs.
+                </p>
               </div>
+              <button
+                type="button"
+                onClick={() => setIsModalOpen(false)}
+                className="shrink-0 rounded-full border border-slate-300 px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.25em] text-slate-600 transition hover:border-slate-400 hover:text-slate-800 dark:border-slate-700 dark:text-slate-300 dark:hover:border-slate-500 dark:hover:text-white"
+              >
+                Close
+              </button>
+            </div>
 
-              <div className="space-y-4">
-                <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-                  {displayPairs.map((pair, index) => {
-                    const topImage = pair.top;
-                    const bottomImage = pair.bottom;
-                    const isActive = activePairIndex === index;
-                    return (
-                      <div
-                        key={pair.id}
-                        className={`flex flex-col gap-2.5 rounded-2xl border border-slate-200 bg-slate-50 p-3 transition-colors dark:border-slate-800 dark:bg-slate-950/50 ${
-                          isActive ? "border-sky-400 shadow-inner shadow-sky-500/20" : ""
+            <div className="space-y-4">
+              <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+                {displayPairs.map((pair, index) => {
+                  const topImage = pair.top;
+                  const bottomImage = pair.bottom;
+                  const isActive = activePairIndex === index;
+                  return (
+                    <div
+                      key={pair.id}
+                      className={`flex flex-col gap-2.5 rounded-2xl border border-slate-200 bg-slate-50 p-3 transition-colors dark:border-slate-800 dark:bg-slate-950/50 ${isActive ? "border-sky-400 shadow-inner shadow-sky-500/20" : ""
                         }`}
-                      >
-                        <div className="flex flex-col gap-1">
-                          <span className="text-[9px] font-semibold uppercase tracking-[0.25em] text-slate-500 dark:text-slate-400">
-                            Photo 1 drag or upload photo
-                          </span>
-                          <label
-                            onDrop={(event) => void handleDrop(event, index, "top")}
-                            onDragOver={(event) => handleDragOver(event, index, "top")}
-                            onDragLeave={handleDragLeave}
-                            className={`group relative flex aspect-square w-full cursor-pointer items-center justify-center overflow-hidden rounded-xl border border-dashed border-slate-300 bg-white text-center transition-colors dark:border-slate-700 dark:bg-slate-950/70 ${
-                              dragTarget?.pairIndex === index && dragTarget.slot === "top"
-                                ? "border-sky-400 text-sky-700 dark:text-sky-200"
-                                : "hover:border-slate-400 hover:text-slate-700 dark:hover:border-slate-500 dark:hover:text-slate-200"
+                    >
+                      <div className="flex flex-col gap-1">
+                        <span className="text-[9px] font-semibold uppercase tracking-[0.25em] text-slate-500 dark:text-slate-400">
+                          Photo 1 drag or upload photo
+                        </span>
+                        <label
+                          onDrop={(event) => void handleDrop(event, index, "top")}
+                          onDragOver={(event) => handleDragOver(event, index, "top")}
+                          onDragLeave={handleDragLeave}
+                          className={`group relative flex aspect-square w-full cursor-pointer items-center justify-center overflow-hidden rounded-xl border border-dashed border-slate-300 bg-white text-center transition-colors dark:border-slate-700 dark:bg-slate-950/70 ${dragTarget?.pairIndex === index && dragTarget.slot === "top"
+                            ? "border-sky-400 text-sky-700 dark:text-sky-200"
+                            : "hover:border-slate-400 hover:text-slate-700 dark:hover:border-slate-500 dark:hover:text-slate-200"
                             }`}
-                          >
-                            <input
-                              type="file"
-                              accept={ACCEPTED_TYPES.join(",")}
-                              multiple
-                              className="hidden"
-                              onChange={(event) => void handleFileInput(event, index, "top")}
-                            />
-                            {imagePreview(topImage)}
-                            {topImage ? (
-                              <button
-                                type="button"
-                                onClick={(event) => handleRemoveImage(event, index, "top")}
-                                className="absolute right-2 top-2 rounded-full bg-slate-200 px-2 py-1 text-[10px] font-semibold uppercase tracking-[0.25em] text-slate-700 transition hover:bg-slate-300 dark:bg-slate-900/80 dark:text-slate-200 dark:hover:bg-slate-800"
-                              >
-                                Remove
-                              </button>
-                            ) : null}
-                          </label>
-                        </div>
-
-                        <div className="flex flex-col gap-1">
-                          <span className="text-[9px] font-semibold uppercase tracking-[0.25em] text-slate-500 dark:text-slate-400">
-                            Photo 2 drag or upload photo
-                          </span>
-                          <label
-                            onDrop={(event) => void handleDrop(event, index, "bottom")}
-                            onDragOver={(event) => handleDragOver(event, index, "bottom")}
-                            onDragLeave={handleDragLeave}
-                            className={`group relative flex aspect-square w-full cursor-pointer items-center justify-center overflow-hidden rounded-xl border border-dashed border-slate-300 bg-white text-center transition-colors dark:border-slate-700 dark:bg-slate-950/70 ${
-                              dragTarget?.pairIndex === index && dragTarget.slot === "bottom"
-                                ? "border-sky-400 text-sky-700 dark:text-sky-200"
-                                : "hover:border-slate-400 hover:text-slate-700 dark:hover:border-slate-500 dark:hover:text-slate-200"
-                            }`}
-                          >
-                            <input
-                              type="file"
-                              accept={ACCEPTED_TYPES.join(",")}
-                              multiple
-                              className="hidden"
-                              onChange={(event) => void handleFileInput(event, index, "bottom")}
-                            />
-                            {imagePreview(bottomImage)}
-                            {bottomImage ? (
-                              <button
-                                type="button"
-                                onClick={(event) => handleRemoveImage(event, index, "bottom")}
-                                className="absolute right-2 top-2 rounded-full bg-slate-200 px-2 py-1 text-[10px] font-semibold uppercase tracking-[0.25em] text-slate-700 transition hover:bg-slate-300 dark:bg-slate-900/80 dark:text-slate-200 dark:hover:bg-slate-800"
-                              >
-                                Remove
-                              </button>
-                            ) : null}
-                          </label>
-                        </div>
-
-                        <div className="flex flex-wrap items-center justify-between gap-2">
-                          <button
-                            type="button"
-                            onClick={() => setActivePairIndex(index)}
-                            className={`rounded-full px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.25em] transition ${
-                              isActive
-                                ? "bg-sky-500/30 text-sky-100"
-                                : "bg-slate-800 text-slate-300 hover:bg-slate-700"
-                            }`}
-                          >
-                            Preview pair
-                          </button>
-                          {photoPairs.length > 1 ? (
+                        >
+                          <input
+                            type="file"
+                            accept={ACCEPTED_TYPES.join(",")}
+                            multiple
+                            className="hidden"
+                            onChange={(event) => void handleFileInput(event, index, "top")}
+                          />
+                          {imagePreview(topImage)}
+                          {topImage ? (
                             <button
                               type="button"
-                              onClick={() => removePhotoPair(index)}
-                              className="rounded-full border border-slate-300 px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.25em] text-slate-600 transition hover:border-slate-400 hover:text-slate-800 dark:border-slate-700 dark:text-slate-400 dark:hover:border-slate-500 dark:hover:text-slate-200"
+                              onClick={(event) => handleRemoveImage(event, index, "top")}
+                              className="absolute right-2 top-2 rounded-full bg-slate-200 px-2 py-1 text-[10px] font-semibold uppercase tracking-[0.25em] text-slate-700 transition hover:bg-slate-300 dark:bg-slate-900/80 dark:text-slate-200 dark:hover:bg-slate-800"
                             >
-                              Remove pair
+                              Remove
                             </button>
                           ) : null}
-                        </div>
+                        </label>
                       </div>
-                    );
-                  })}
-                </div>
 
+                      <div className="flex flex-col gap-1">
+                        <span className="text-[9px] font-semibold uppercase tracking-[0.25em] text-slate-500 dark:text-slate-400">
+                          Photo 2 drag or upload photo
+                        </span>
+                        <label
+                          onDrop={(event) => void handleDrop(event, index, "bottom")}
+                          onDragOver={(event) => handleDragOver(event, index, "bottom")}
+                          onDragLeave={handleDragLeave}
+                          className={`group relative flex aspect-square w-full cursor-pointer items-center justify-center overflow-hidden rounded-xl border border-dashed border-slate-300 bg-white text-center transition-colors dark:border-slate-700 dark:bg-slate-950/70 ${dragTarget?.pairIndex === index && dragTarget.slot === "bottom"
+                            ? "border-sky-400 text-sky-700 dark:text-sky-200"
+                            : "hover:border-slate-400 hover:text-slate-700 dark:hover:border-slate-500 dark:hover:text-slate-200"
+                            }`}
+                        >
+                          <input
+                            type="file"
+                            accept={ACCEPTED_TYPES.join(",")}
+                            multiple
+                            className="hidden"
+                            onChange={(event) => void handleFileInput(event, index, "bottom")}
+                          />
+                          {imagePreview(bottomImage)}
+                          {bottomImage ? (
+                            <button
+                              type="button"
+                              onClick={(event) => handleRemoveImage(event, index, "bottom")}
+                              className="absolute right-2 top-2 rounded-full bg-slate-200 px-2 py-1 text-[10px] font-semibold uppercase tracking-[0.25em] text-slate-700 transition hover:bg-slate-300 dark:bg-slate-900/80 dark:text-slate-200 dark:hover:bg-slate-800"
+                            >
+                              Remove
+                            </button>
+                          ) : null}
+                        </label>
+                      </div>
 
-                <div className="flex flex-wrap items-center justify-between gap-3">
-                  <div className="flex flex-wrap gap-2">
-                    {displayPairs.map((pair, index) => (
-                      <div
-                        key={`${pair.id}-chip`}
-                        className={`flex items-center gap-1 rounded-full border px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.25em] ${
-                          activePairIndex === index
-                            ? "border-sky-400 bg-sky-500/20 text-sky-700 dark:text-sky-100"
-                            : "border-slate-300 bg-slate-200 text-slate-700 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-300"
-                        }`}
-                      >
+                      <div className="flex flex-wrap items-center justify-between gap-2">
                         <button
                           type="button"
                           onClick={() => setActivePairIndex(index)}
-                          className="transition hover:text-slate-900 dark:hover:text-white"
+                          className={`rounded-full px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.25em] transition ${isActive
+                            ? "bg-sky-500/30 text-sky-100"
+                            : "bg-slate-800 text-slate-300 hover:bg-slate-700"
+                            }`}
                         >
-                          Pair {index + 1}
+                          Preview pair
                         </button>
                         {photoPairs.length > 1 ? (
                           <button
                             type="button"
                             onClick={() => removePhotoPair(index)}
-                            className="text-slate-500 transition hover:text-rose-500 dark:text-slate-400 dark:hover:text-rose-300"
-                            aria-label={`Remove pair ${index + 1}`}
+                            className="rounded-full border border-slate-300 px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.25em] text-slate-600 transition hover:border-slate-400 hover:text-slate-800 dark:border-slate-700 dark:text-slate-400 dark:hover:border-slate-500 dark:hover:text-slate-200"
                           >
-                            ×
+                            Remove pair
                           </button>
                         ) : null}
                       </div>
-                    ))}
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <button
-                      type="button"
-                      onClick={addPhotoPair}
-                      disabled={!canAddPair}
-                      className="rounded-full border border-slate-300 px-4 py-2 text-[11px] font-semibold uppercase tracking-[0.3em] text-slate-600 transition hover:border-slate-400 hover:text-slate-900 disabled:cursor-not-allowed disabled:opacity-50 dark:border-slate-700 dark:text-slate-200 dark:hover:border-slate-500 dark:hover:text-white"
+                    </div>
+                  );
+                })}
+              </div>
+
+
+              <div className="flex flex-wrap items-center justify-between gap-3">
+                <div className="flex flex-wrap gap-2">
+                  {displayPairs.map((pair, index) => (
+                    <div
+                      key={`${pair.id}-chip`}
+                      className={`flex items-center gap-1 rounded-full border px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.25em] ${activePairIndex === index
+                        ? "border-sky-400 bg-sky-500/20 text-sky-700 dark:text-sky-100"
+                        : "border-slate-300 bg-slate-200 text-slate-700 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-300"
+                        }`}
                     >
-                      {canAddPair ? "Add photo pair" : "Max pairs reached"}
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => setIsModalOpen(false)}
-                      className="rounded-full bg-sky-500/15 px-4 py-2 text-[11px] font-semibold uppercase tracking-[0.3em] text-sky-700 transition hover:bg-sky-500/25 dark:bg-sky-500/20 dark:text-sky-100 dark:hover:bg-sky-500/30"
-                    >
-                      Done
-                    </button>
-                  </div>
+                      <button
+                        type="button"
+                        onClick={() => setActivePairIndex(index)}
+                        className="transition hover:text-slate-900 dark:hover:text-white"
+                      >
+                        Pair {index + 1}
+                      </button>
+                      {photoPairs.length > 1 ? (
+                        <button
+                          type="button"
+                          onClick={() => removePhotoPair(index)}
+                          className="text-slate-500 transition hover:text-rose-500 dark:text-slate-400 dark:hover:text-rose-300"
+                          aria-label={`Remove pair ${index + 1}`}
+                        >
+                          ×
+                        </button>
+                      ) : null}
+                    </div>
+                  ))}
+                </div>
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={addPhotoPair}
+                    disabled={!canAddPair}
+                    className="rounded-full border border-slate-300 px-4 py-2 text-[11px] font-semibold uppercase tracking-[0.3em] text-slate-600 transition hover:border-slate-400 hover:text-slate-900 disabled:cursor-not-allowed disabled:opacity-50 dark:border-slate-700 dark:text-slate-200 dark:hover:border-slate-500 dark:hover:text-white"
+                  >
+                    {canAddPair ? "Add photo pair" : "Max pairs reached"}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setIsModalOpen(false)}
+                    className="rounded-full bg-sky-500/15 px-4 py-2 text-[11px] font-semibold uppercase tracking-[0.3em] text-sky-700 transition hover:bg-sky-500/25 dark:bg-sky-500/20 dark:text-sky-100 dark:hover:bg-sky-500/30"
+                  >
+                    Done
+                  </button>
                 </div>
               </div>
             </div>
           </div>
         </div>
-      );
+      </div>
+    );
 
   return (
     <section className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm transition-colors dark:border-slate-800 dark:bg-slate-900/60">
@@ -378,11 +421,10 @@ const mediaModal = !isModalOpen
             return (
               <div
                 key={pair.id}
-                className={`flex items-center gap-2 rounded-full border px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.25em] ${
-                  isActive
-                    ? "border-sky-400 bg-sky-500/20 text-sky-700 dark:text-sky-100"
-                    : "border-slate-300 bg-slate-200 text-slate-700 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-300"
-                }`}
+                className={`flex items-center gap-2 rounded-full border px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.25em] ${isActive
+                  ? "border-sky-400 bg-sky-500/20 text-sky-700 dark:text-sky-100"
+                  : "border-slate-300 bg-slate-200 text-slate-700 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-300"
+                  }`}
               >
                 <button
                   type="button"
@@ -444,11 +486,10 @@ const mediaModal = !isModalOpen
           <button
             type="button"
             onClick={toggleDivider}
-            className={`rounded-full px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.25em] transition ${
-              compare.showDivider
-                ? "bg-sky-500/20 text-sky-700 hover:bg-sky-500/30 dark:text-sky-200"
-                : "bg-slate-200 text-slate-700 hover:bg-slate-300 dark:bg-slate-800 dark:text-slate-300 dark:hover:bg-slate-700"
-            }`}
+            className={`rounded-full px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.25em] transition ${compare.showDivider
+              ? "bg-sky-500/20 text-sky-700 hover:bg-sky-500/30 dark:text-sky-200"
+              : "bg-slate-200 text-slate-700 hover:bg-slate-300 dark:bg-slate-800 dark:text-slate-300 dark:hover:bg-slate-700"
+              }`}
           >
             {compare.showDivider ? "On" : "Off"}
           </button>
