@@ -158,23 +158,23 @@ async function main() {
   }
 
   try {
-    await renderMedia({
-        serveUrl: bundleLocation,
-        composition,
-        codec: 'h264',
-        outputLocation,
-        // inputProps intentionally omitted because props are supplied via composition
-        onDownload: () => undefined,
-        // Let Remotion embed audio from <Audio /> inside the composition
-        audioCodec: 'aac',
-        enforceAudioTrack: true,
-        muted: false,
-        // Keep stdout clean so parent can read only the output path
+  await renderMedia({
+    serveUrl: bundleLocation,
+    composition,
+    codec: 'h264',
+    outputLocation,
+    // inputProps intentionally omitted because props are supplied via composition
+    onDownload: () => undefined,
+    // Let Remotion embed audio from <Audio /> inside the composition
+    audioCodec: 'aac',
+    enforceAudioTrack: true,
+    muted: false,
+    // Keep stdout clean so parent can read only the output path
         logLevel: 'error',
-      });
-    
-      // Print the output path so the caller can read it
-      process.stdout.write(outputLocation);
+  });
+
+  // Print the output path so the caller can read it
+  process.stdout.write(outputLocation);
   } finally {
       server.close();
   }

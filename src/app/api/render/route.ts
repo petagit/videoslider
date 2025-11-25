@@ -3,6 +3,8 @@ import path from "node:path";
 import os from "node:os";
 import fs from "node:fs/promises";
 import { spawn } from "node:child_process";
+import { renderMediaOnLambda, getRenderProgress } from "@remotion/lambda/client";
+import { uploadBase64ToS3 } from "@/lib/s3-upload";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 300;
@@ -30,125 +32,205 @@ async function saveBase64ToFile(base64Str: string, tmpDir: string, prefix: strin
   return `file://${filePath}`;
 }
 
+async function resolveAsset(
+  asset: string,
+  tmpDir: string,
+  prefix: string,
+  useLambda: boolean
+): Promise<string> {
+  if (!asset) return asset;
+
+  if (useLambda) {
+    // If base64, upload to S3
+    if (asset.startsWith("data:")) {
+      const matches = asset.match(/^data:([A-Za-z-+\/]+);base64,(.+)$/);
+      const type = matches?.[1] ?? "image/png";
+      let ext = type.split('/')[1] || 'bin';
+      if (ext === 'mpeg') ext = 'mp3';
+      if (ext === 'svg+xml') ext = 'svg';
+      
+      const filename = `${prefix}-${Date.now()}-${Math.random().toString(36).slice(2)}.${ext}`;
+      return await uploadBase64ToS3(asset, filename);
+    }
+    // If it's a local file (audioPreset), we need to upload it to S3 too
+    // BUT, the client sends "audioPreset" which is a filename.
+    // We need to read it and upload.
+    // We'll handle audioPreset separately in the main flow.
+    return asset;
+  } else {
+    return saveBase64ToFile(asset, tmpDir, prefix);
+  }
+}
+
 export async function POST(request: NextRequest): Promise<NextResponse> {
   try {
     const body = await request.json();
     const { compositionId = "slider-reveal", ...payload } = body;
 
-    const tmpDir: string = await fs.mkdtemp(path.join(os.tmpdir(), "slider-render-"));
+    const useLambda = !!process.env.REMOTION_LAMBDA_FUNCTION_NAME;
     
-    let audioDataUrl: string | null = null;
-
-    // Handle audio
-    if (payload.audioPreset) {
-      // It's a local file in public/
-      const presetPath = path.join(process.cwd(), "public", "slideshow-music-library", path.basename(payload.audioPreset));
-      // Use absolute path
-      audioDataUrl = `file://${presetPath}`;
-    } else if (payload.audio) {
-      // Could be base64 (uploaded) or remote URL
-      if (payload.audio.startsWith('data:')) {
-        audioDataUrl = await saveBase64ToFile(payload.audio, tmpDir, 'audio');
-      } else if (/^https?:\/\//i.test(payload.audio)) {
-        // Remote URL - download it
-        try {
-          const res = await fetch(payload.audio);
-          const arrayBuffer = await res.arrayBuffer();
-          const buffer = Buffer.from(arrayBuffer);
-          const mime = res.headers.get("content-type") ?? "audio/mpeg";
-          let ext = "mp3";
-          if (mime.includes("wav")) ext = "wav";
-          
-          const filename = `downloaded-audio.${ext}`;
-          const filePath = path.join(tmpDir, filename);
-          await fs.writeFile(filePath, buffer);
-          audioDataUrl = `file://${filePath}`;
-        } catch (e) {
-            console.warn("Failed to download remote audio", e);
-            audioDataUrl = null;
-        }
-      } else {
-        // Unknown format or already a path?
-        audioDataUrl = payload.audio;
-      }
+    let tmpDir = "";
+    if (!useLambda) {
+      tmpDir = await fs.mkdtemp(path.join(os.tmpdir(), "slider-render-"));
     }
 
-    // Process Images - convert base64 to files
+    // --- PREPARE ASSETS ---
+    let audioDataUrl: string | null = null;
+
+    if (payload.audioPreset) {
+       const presetPath = path.join(process.cwd(), "public", "slideshow-music-library", path.basename(payload.audioPreset));
+       if (useLambda) {
+         // Read file and upload to S3
+         const fileBuffer = await fs.readFile(presetPath);
+         const base64 = `data:audio/mp3;base64,${fileBuffer.toString("base64")}`;
+         const filename = `preset-${path.basename(payload.audioPreset)}`;
+         audioDataUrl = await uploadBase64ToS3(base64, filename);
+       } else {
+         audioDataUrl = `file://${presetPath}`;
+       }
+    } else if (payload.audio) {
+       if (useLambda) {
+          if (payload.audio.startsWith("data:")) {
+             audioDataUrl = await resolveAsset(payload.audio, tmpDir, "audio", true);
+          } else {
+             audioDataUrl = payload.audio;
+          }
+       } else {
+          // Existing logic for local
+          if (payload.audio.startsWith('data:')) {
+            audioDataUrl = await saveBase64ToFile(payload.audio, tmpDir, 'audio');
+          } else if (/^https?:\/\//i.test(payload.audio)) {
+            // Remote URL - download it for local render
+             try {
+                const res = await fetch(payload.audio);
+                const arrayBuffer = await res.arrayBuffer();
+                const buffer = Buffer.from(arrayBuffer);
+                const mime = res.headers.get("content-type") ?? "audio/mpeg";
+                let ext = "mp3";
+                if (mime.includes("wav")) ext = "wav";
+                
+                const filename = `downloaded-audio.${ext}`;
+                const filePath = path.join(tmpDir, filename);
+                await fs.writeFile(filePath, buffer);
+                audioDataUrl = `file://${filePath}`;
+              } catch (e) {
+                  console.warn("Failed to download remote audio", e);
+                audioDataUrl = null;
+              }
+          } else {
+            audioDataUrl = payload.audio;
+          }
+       }
+    }
+
+    // Process Images
     if (payload.images && Array.isArray(payload.images)) {
       payload.images = await Promise.all(payload.images.map((img: string, i: number) => 
-        saveBase64ToFile(img, tmpDir, `slide-${i}`)
+        resolveAsset(img, tmpDir, `slide-${i}`, useLambda)
       ));
     }
 
     if (payload.topImages && Array.isArray(payload.topImages)) {
         payload.topImages = await Promise.all(payload.topImages.map((img: string, i: number) => 
-          saveBase64ToFile(img, tmpDir, `top-${i}`)
+          resolveAsset(img, tmpDir, `top-${i}`, useLambda)
         ));
     }
 
     if (payload.bottomImages && Array.isArray(payload.bottomImages)) {
         payload.bottomImages = await Promise.all(payload.bottomImages.map((img: string, i: number) => 
-          saveBase64ToFile(img, tmpDir, `bottom-${i}`)
+          resolveAsset(img, tmpDir, `bottom-${i}`, useLambda)
         ));
     }
 
-    const payloadPath: string = path.join(tmpDir, "payload.json");
-    // We update the payload with the file:// URLs
-    await fs.writeFile(payloadPath, JSON.stringify({ ...payload, audio: audioDataUrl }), "utf-8");
+    const finalPayload = { ...payload, audio: audioDataUrl };
 
-    const scriptPath: string = path.join(process.cwd(), "scripts", "render.js");
-    const videoFileName = `render-${Date.now()}-${Math.random().toString(36).substring(2, 9)}.mp4`;
+    // --- EXECUTE RENDER ---
 
-    const outputPath: string = await new Promise((resolve, reject) => {
-      const child = spawn(process.execPath, [scriptPath, payloadPath, videoFileName, compositionId], {
-        cwd: process.cwd(),
-        stdio: ["ignore", "pipe", "pipe"],
-        env: process.env,
+    if (useLambda) {
+      const region = process.env.REMOTION_AWS_REGION || "us-east-1";
+      const functionName = process.env.REMOTION_LAMBDA_FUNCTION_NAME!;
+      const serveUrl = process.env.REMOTION_LAMBDA_SERVE_URL!;
+      
+      // Determine props based on composition
+      // We need to map payload to props expected by composition
+      // The payload structure seems to match props mostly.
+      
+      const { renderId, bucketName } = await renderMediaOnLambda({
+        region,
+        functionName,
+        serveUrl,
+        composition: compositionId,
+        inputProps: finalPayload,
+        codec: "h264",
       });
 
-      let stdout = "";
-      let stderr = "";
-      child.stdout.on("data", (d: Buffer) => {
-        stdout += d.toString();
-      });
-      child.stderr.on("data", (d: Buffer) => {
-        stderr += d.toString();
-      });
-      child.on("close", (code: number) => {
-        if (code === 0) {
-          const lastLine = stdout.trim().split("\n").pop() ?? "";
-          // The script prints the output path as the last line
-          // It might also print Remotion logs, so we look for the path
-          if (lastLine.startsWith("/") || lastLine.match(/^[a-zA-Z]:\\/)) { 
-             resolve(lastLine);
-          } else {
-             // Fallback: try to find lines that look like paths or just check the known output location
-             // scripts/render.js prints: process.stdout.write(outputLocation);
-             // But Remotion might log stuff. render.js sets `quiet` or we capture stdout?
-             // render.js sets quiet? No.
-             // But we pipe stdout.
-             // Let's assume the script output ends with the path.
-             resolve(lastLine);
-          }
-        } else {
-          reject(new Error(`Render process exited with code ${code}: ${stderr}`));
+      // Poll for progress
+      while (true) {
+        await new Promise((resolve) => setTimeout(resolve, 2000));
+        const progress = await getRenderProgress({
+          region,
+          bucketName,
+          renderId,
+          functionName,
+        });
+
+        if (progress.done) {
+          return NextResponse.json({ url: progress.outputFile });
         }
+        if (progress.fatalErrorEncountered) {
+          throw new Error(progress.errors[0].message);
+        }
+      }
+
+    } else {
+      // --- LOCAL RENDER LOGIC ---
+      const payloadPath: string = path.join(tmpDir, "payload.json");
+      await fs.writeFile(payloadPath, JSON.stringify(finalPayload), "utf-8");
+
+      const scriptPath: string = path.join(process.cwd(), "scripts", "render.js");
+      const videoFileName = `render-${Date.now()}-${Math.random().toString(36).substring(2, 9)}.mp4`;
+
+      const outputPath: string = await new Promise((resolve, reject) => {
+        const child = spawn(process.execPath, [scriptPath, payloadPath, videoFileName, compositionId], {
+          cwd: process.cwd(),
+          stdio: ["ignore", "pipe", "pipe"],
+          env: process.env,
+        });
+
+        let stdout = "";
+        let stderr = "";
+        child.stdout.on("data", (d: Buffer) => {
+          stdout += d.toString();
+        });
+        child.stderr.on("data", (d: Buffer) => {
+          stderr += d.toString();
+        });
+        child.on("close", (code: number) => {
+          if (code === 0) {
+            const lastLine = stdout.trim().split("\n").pop() ?? "";
+            if (lastLine.startsWith("/") || lastLine.match(/^[a-zA-Z]:\\/)) { 
+              resolve(lastLine);
+            } else {
+               resolve(lastLine);
+            }
+          } else {
+            reject(new Error(`Render process exited with code ${code}: ${stderr}`));
+          }
+        });
+        child.on("error", (err: Error) => reject(err));
       });
-      child.on("error", (err: Error) => reject(err));
-    });
 
-    // Move the rendered file to public/renders
-    const publicRendersDir = path.join(process.cwd(), "public", "renders");
-    await fs.mkdir(publicRendersDir, { recursive: true });
-    const publicFilePath = path.join(publicRendersDir, videoFileName);
+      const publicRendersDir = path.join(process.cwd(), "public", "renders");
+      await fs.mkdir(publicRendersDir, { recursive: true });
+      const publicFilePath = path.join(publicRendersDir, videoFileName);
 
-    // outputPath is in tmpDir
-    await fs.copyFile(outputPath, publicFilePath);
-    await fs.rm(tmpDir, { recursive: true, force: true });
+      await fs.copyFile(outputPath, publicFilePath);
+      await fs.rm(tmpDir, { recursive: true, force: true });
 
-    const publicUrl = `/renders/${videoFileName}`;
+      const publicUrl = `/renders/${videoFileName}`;
+      return NextResponse.json({ url: publicUrl });
+    }
 
-    return NextResponse.json({ url: publicUrl });
   } catch (error) {
     console.error("Remotion render failed", error);
     const message = error instanceof Error ? error.message : "Unknown error";
