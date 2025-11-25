@@ -97,44 +97,90 @@ export default function SlideshowPage() {
         });
     };
 
+    const uploadFileToS3 = async (file: File): Promise<string> => {
+        // Get presigned URL
+        const res = await fetch("/api/upload-url", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+                filename: file.name,
+                contentType: file.type,
+            }),
+        });
+
+        if (!res.ok) throw new Error("Failed to get upload URL");
+        const { uploadUrl, fileUrl } = await res.json();
+
+        // Upload to S3
+        const uploadRes = await fetch(uploadUrl, {
+            method: "PUT",
+            body: file,
+            headers: { "Content-Type": file.type },
+        });
+
+        if (!uploadRes.ok) throw new Error("Failed to upload file to S3");
+
+        return fileUrl;
+    };
+
     const handleGenerate = async (renderMode: 'lambda' | 'local' = 'lambda') => {
         setIsGenerating(true);
         setVideoUrl(null);
         setCdnUrl(null);
         try {
-            // Convert files to base64 for Node.js rendering
-            const base64Images = await Promise.all(imageFiles.map(fileToBase64));
-            let audioDataUrl = null;
+            let imageUrls: string[] = [];
+            let audioUrl: string | null = null;
 
-            if (uploadedMusicFile) {
-                audioDataUrl = await fileToBase64(uploadedMusicFile);
+            if (renderMode === 'lambda') {
+                // Upload images to S3
+                imageUrls = await Promise.all(imageFiles.map(uploadFileToS3));
+
+                // Upload audio if custom file
+                if (uploadedMusicFile) {
+                    audioUrl = await uploadFileToS3(uploadedMusicFile);
+                } else if (selectedMusic) {
+                    // If preset is selected, we pass the preset filename. 
+                    // The API handles presets, but we can also resolve it here if we wanted.
+                    // For now, let's stick to passing the preset name as before, 
+                    // or if we want to be consistent, we could upload it? 
+                    // Actually, the API logic for presets is fine.
+                }
+            } else {
+                // Local mode: use base64 as before
+                imageUrls = await Promise.all(imageFiles.map(fileToBase64));
+                if (uploadedMusicFile) {
+                    audioUrl = await fileToBase64(uploadedMusicFile);
+                }
             }
+
+            const payload = {
+                compositionId: "slideshow",
+                images: imageUrls,
+                durationPerSlide,
+                animation: { frameRate: 30 },
+                audioPreset: selectedMusic,
+                audio: audioUrl, // This will be S3 URL for lambda, base64 for local
+                renderMode,
+            };
 
             const response = await fetch("/api/render", {
                 method: "POST",
                 headers: {
                     "Content-Type": "application/json",
                 },
-                body: JSON.stringify({
-                    compositionId: "slideshow",
-                    images: base64Images,
-                    durationPerSlide,
-                    animation: { frameRate: 30 },
-                    audioPreset: selectedMusic,
-                    audio: audioDataUrl,
-                    renderMode,
-                }),
+                body: JSON.stringify(payload),
             });
 
             if (!response.ok) {
-                throw new Error("Failed to generate video");
+                const errData = await response.json();
+                throw new Error(errData.message || "Failed to generate video");
             }
 
             const data = await response.json();
             setVideoUrl(data.url);
         } catch (error) {
             console.error(error);
-            alert("Error generating video");
+            alert(error instanceof Error ? error.message : "Error generating video");
         } finally {
             setIsGenerating(false);
         }

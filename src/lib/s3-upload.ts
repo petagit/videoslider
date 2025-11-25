@@ -17,11 +17,11 @@ export async function uploadBase64ToS3(
   if (!matches || matches.length !== 3) {
     // If it's already a URL, return it
     if (base64Str.startsWith("http")) return base64Str;
-    
+
     // Debug logging
     const snippet = base64Str.length > 50 ? base64Str.substring(0, 50) + "..." : base64Str;
     console.error(`Invalid base64 string for file ${filename}. Length: ${base64Str.length}. Snippet: ${snippet}`);
-    
+
     throw new Error(`Invalid base64 string for ${filename}`);
   }
 
@@ -74,3 +74,28 @@ export async function uploadBufferToS3(
   return `https://${bucketName}.s3.${process.env.REMOTION_AWS_REGION || "us-east-1"}.amazonaws.com/uploads/${filename}`;
 }
 
+
+export async function getPresignedUrl(
+  filename: string,
+  contentType: string
+): Promise<{ uploadUrl: string; fileUrl: string }> {
+  const { getSignedUrl } = await import("@aws-sdk/s3-request-presigner");
+  const bucketName = process.env.REMOTION_BUCKET;
+
+  if (!bucketName) {
+    throw new Error("REMOTION_BUCKET env var not set");
+  }
+
+  const key = `uploads/${filename}`;
+  const command = new PutObjectCommand({
+    Bucket: bucketName,
+    Key: key,
+    ContentType: contentType,
+    ACL: "public-read",
+  });
+
+  const uploadUrl = await getSignedUrl(s3Client, command, { expiresIn: 3600 });
+  const fileUrl = `https://${bucketName}.s3.${process.env.REMOTION_AWS_REGION || "us-east-1"}.amazonaws.com/${key}`;
+
+  return { uploadUrl, fileUrl };
+}

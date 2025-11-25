@@ -10,6 +10,7 @@
   },
   "dependencies": {
     "@aws-sdk/client-s3": "3.787.0",
+    "@aws-sdk/s3-request-presigner": "^3.939.0",
     "@ffmpeg/ffmpeg": "^0.12.15",
     "@remotion/bundler": "^4.0.377",
     "@remotion/lambda": "^4.0.377",
@@ -27,6 +28,7 @@
     "react-markdown": "^10.1.0",
     "remark-gfm": "^4.0.1",
     "remotion": "^4.0.377",
+    "sonner": "^2.0.7",
     "zustand": "^5.0.8"
   },
   "devDependencies": {
