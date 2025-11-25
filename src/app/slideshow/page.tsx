@@ -1,8 +1,9 @@
 "use client";
 
-import React, { useState, useCallback, useEffect } from "react";
+import React, { useState, useCallback, useEffect, useRef } from "react";
 import { Player } from "@remotion/player";
 import { SlideshowComposition } from "../../../remotion/SlideshowComposition";
+import { toast } from "sonner";
 
 interface MusicPreset {
     id: string;
@@ -24,6 +25,10 @@ export default function SlideshowPage() {
     const [dragActive, setDragActive] = useState(false);
     const [isCdnUploading, setIsCdnUploading] = useState(false);
     const [cdnUrl, setCdnUrl] = useState<string | null>(null);
+    const [progress, setProgress] = useState(0);
+    const [renderStatus, setRenderStatus] = useState<string | null>(null);
+    const [elapsedTime, setElapsedTime] = useState(0);
+    const timerRef = useRef<NodeJS.Timeout | null>(null);
 
     useEffect(() => {
         fetch("/api/music-presets")
@@ -127,23 +132,28 @@ export default function SlideshowPage() {
         setIsGenerating(true);
         setVideoUrl(null);
         setCdnUrl(null);
+        setProgress(0);
+        setRenderStatus("Initializing...");
+        setElapsedTime(0);
+
+        // Start timer
+        if (timerRef.current) clearInterval(timerRef.current);
+        timerRef.current = setInterval(() => {
+            setElapsedTime((prev) => prev + 1);
+        }, 1000);
+
         try {
             let imageUrls: string[] = [];
             let audioUrl: string | null = null;
 
             if (renderMode === 'lambda') {
+                setRenderStatus("Uploading assets...");
                 // Upload images to S3
                 imageUrls = await Promise.all(imageFiles.map(uploadFileToS3));
 
                 // Upload audio if custom file
                 if (uploadedMusicFile) {
                     audioUrl = await uploadFileToS3(uploadedMusicFile);
-                } else if (selectedMusic) {
-                    // If preset is selected, we pass the preset filename. 
-                    // The API handles presets, but we can also resolve it here if we wanted.
-                    // For now, let's stick to passing the preset name as before, 
-                    // or if we want to be consistent, we could upload it? 
-                    // Actually, the API logic for presets is fine.
                 }
             } else {
                 // Local mode: use base64 as before
@@ -159,30 +169,69 @@ export default function SlideshowPage() {
                 durationPerSlide,
                 animation: { frameRate: 30 },
                 audioPreset: selectedMusic,
-                audio: audioUrl, // This will be S3 URL for lambda, base64 for local
+                audio: audioUrl,
                 renderMode,
             };
 
+            setRenderStatus("Starting render...");
             const response = await fetch("/api/render", {
                 method: "POST",
-                headers: {
-                    "Content-Type": "application/json",
-                },
+                headers: { "Content-Type": "application/json" },
                 body: JSON.stringify(payload),
             });
 
             if (!response.ok) {
                 const errData = await response.json();
-                throw new Error(errData.message || "Failed to generate video");
+                throw new Error(errData.message || "Failed to start render");
             }
 
             const data = await response.json();
-            setVideoUrl(data.url);
+
+            if (renderMode === 'lambda') {
+                const { renderId, bucketName, functionName, region } = data;
+
+                // Poll for progress
+                while (true) {
+                    await new Promise(r => setTimeout(r, 1000));
+                    const statusRes = await fetch("/api/render/status", {
+                        method: "POST",
+                        headers: { "Content-Type": "application/json" },
+                        body: JSON.stringify({ renderId, bucketName, functionName, region }),
+                    });
+
+                    if (!statusRes.ok) continue;
+
+                    const status = await statusRes.json();
+
+                    if (status.fatalErrorEncountered) {
+                        throw new Error(status.errors?.[0]?.message || "Render failed");
+                    }
+
+                    if (status.done) {
+                        setVideoUrl(status.outputFile);
+                        setProgress(1);
+                        setRenderStatus("Done!");
+                        toast.success("Render completed successfully!");
+                        break;
+                    }
+
+                    setProgress(status.overallProgress);
+                    setRenderStatus(`Rendering: ${Math.round(status.overallProgress * 100)}%`);
+                }
+            } else {
+                // Local render returns URL directly
+                setVideoUrl(data.url);
+                toast.success("Render completed successfully!");
+            }
+
         } catch (error) {
             console.error(error);
-            alert(error instanceof Error ? error.message : "Error generating video");
+            const msg = error instanceof Error ? error.message : "Error generating video";
+            toast.error(msg);
+            setRenderStatus("Error");
         } finally {
             setIsGenerating(false);
+            if (timerRef.current) clearInterval(timerRef.current);
         }
     };
 
@@ -354,20 +403,37 @@ export default function SlideshowPage() {
                         </header>
 
                         <div className="flex flex-col gap-2">
-                            <button
-                                onClick={() => handleGenerate('lambda')}
-                                disabled={isGenerating || images.length === 0}
-                                className="w-full inline-flex items-center justify-center rounded-full bg-sky-500/15 px-4 py-3 text-[11px] font-semibold uppercase tracking-[0.3em] text-sky-700 shadow-inner shadow-sky-500/20 transition hover:bg-sky-500/25 disabled:cursor-not-allowed disabled:opacity-60 dark:bg-sky-500/10 dark:text-sky-100 dark:hover:bg-sky-500/20"
-                            >
-                                {isGenerating ? "Generating..." : "Render with Lambda"}
-                            </button>
-                            <button
-                                onClick={() => handleGenerate('local')}
-                                disabled={isGenerating || images.length === 0}
-                                className="w-full inline-flex items-center justify-center rounded-full border border-slate-200 bg-white px-4 py-3 text-[11px] font-semibold uppercase tracking-[0.3em] text-slate-600 transition hover:bg-slate-50 hover:text-slate-900 disabled:cursor-not-allowed disabled:opacity-60 dark:border-slate-800 dark:bg-transparent dark:text-slate-400 dark:hover:bg-slate-800 dark:hover:text-slate-200"
-                            >
-                                {isGenerating ? "Generating..." : "Render Locally"}
-                            </button>
+                            {isGenerating ? (
+                                <div className="rounded-xl border border-slate-200 bg-slate-50 p-4 dark:border-slate-800 dark:bg-slate-900/50">
+                                    <div className="mb-2 flex items-center justify-between text-[10px] font-medium uppercase tracking-wider text-slate-500">
+                                        <span>{renderStatus}</span>
+                                        <span className="font-mono">{Math.floor(elapsedTime / 60)}:{(elapsedTime % 60).toString().padStart(2, '0')}</span>
+                                    </div>
+                                    <div className="h-2 w-full overflow-hidden rounded-full bg-slate-200 dark:bg-slate-800">
+                                        <div
+                                            className="h-full bg-sky-500 transition-all duration-300 ease-out"
+                                            style={{ width: `${Math.max(5, progress * 100)}%` }}
+                                        />
+                                    </div>
+                                </div>
+                            ) : (
+                                <>
+                                    <button
+                                        onClick={() => handleGenerate('lambda')}
+                                        disabled={images.length === 0}
+                                        className="w-full inline-flex items-center justify-center rounded-full bg-sky-500/15 px-4 py-3 text-[11px] font-semibold uppercase tracking-[0.3em] text-sky-700 shadow-inner shadow-sky-500/20 transition hover:bg-sky-500/25 disabled:cursor-not-allowed disabled:opacity-60 dark:bg-sky-500/10 dark:text-sky-100 dark:hover:bg-sky-500/20"
+                                    >
+                                        Render with Lambda
+                                    </button>
+                                    <button
+                                        onClick={() => handleGenerate('local')}
+                                        disabled={images.length === 0}
+                                        className="w-full inline-flex items-center justify-center rounded-full border border-slate-200 bg-white px-4 py-3 text-[11px] font-semibold uppercase tracking-[0.3em] text-slate-600 transition hover:bg-slate-50 hover:text-slate-900 disabled:cursor-not-allowed disabled:opacity-60 dark:border-slate-800 dark:bg-transparent dark:text-slate-400 dark:hover:bg-slate-800 dark:hover:text-slate-200"
+                                    >
+                                        Render Locally
+                                    </button>
+                                </>
+                            )}
                         </div>
 
                         {videoUrl && (
