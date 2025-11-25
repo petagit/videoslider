@@ -7,6 +7,7 @@ import {
   AttachRolePolicyCommand,
   GetRoleCommand,
 } from "@aws-sdk/client-iam";
+import { S3Client, PutBucketCorsCommand } from "@aws-sdk/client-s3";
 
 dotenv.config();
 
@@ -86,6 +87,32 @@ async function main() {
     console.log("📦 Checking/Creating S3 Bucket...");
     const { bucketName } = await getOrCreateBucket({ region });
     console.log(`✅ Bucket: ${bucketName}`);
+
+    // 1.5 Configure CORS for the bucket
+    console.log("🔓 Configuring Bucket CORS...");
+    const s3Client = new S3Client({
+      region,
+      credentials: {
+        accessKeyId: process.env.REMOTION_AWS_ACCESS_KEY_ID!,
+        secretAccessKey: process.env.REMOTION_AWS_SECRET_ACCESS_KEY!,
+      },
+    });
+
+    await s3Client.send(new PutBucketCorsCommand({
+      Bucket: bucketName,
+      CORSConfiguration: {
+        CORSRules: [
+          {
+            AllowedHeaders: ["*"],
+            AllowedMethods: ["PUT", "POST", "GET", "HEAD"],
+            AllowedOrigins: ["*"], // For production, you might want to restrict this to your Vercel domain
+            ExposeHeaders: ["ETag"],
+            MaxAgeSeconds: 3000,
+          },
+        ],
+      },
+    }));
+    console.log("✅ Bucket CORS configured.");
 
     // 2. Deploy Function
     console.log("⚡ Deploying Lambda function...");
