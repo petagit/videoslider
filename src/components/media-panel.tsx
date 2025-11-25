@@ -75,34 +75,54 @@ export function MediaPanel() {
   );
   const activePairNumber = photoPairs.length > 0 ? Math.min(activePairIndex, photoPairs.length - 1) + 1 : 1;
 
-  const assignImage = useCallback(
-    async (pairIndex: number, slot: SlotKind, file?: File) => {
-      if (!file || !ACCEPTED_TYPES.includes(file.type)) {
-        return;
+  const assignImages = useCallback(
+    async (startPairIndex: number, startSlot: SlotKind, files: File[]) => {
+      const validFiles = files.filter((file) => ACCEPTED_TYPES.includes(file.type));
+      if (validFiles.length === 0) return;
+
+      const images = await Promise.all(validFiles.map(buildUploadedImage));
+
+      let currentPairIndex = startPairIndex;
+      let currentSlot = startSlot;
+
+      for (const image of images) {
+        if (currentPairIndex >= MAX_PAIRS) break;
+
+        const currentPairs = useAppStore.getState().photoPairs;
+        if (currentPairIndex >= currentPairs.length) {
+          addPhotoPair();
+        }
+
+        setPhotoAt(currentPairIndex, currentSlot, image);
+
+        if (currentSlot === "top") {
+          currentSlot = "bottom";
+        } else {
+          currentSlot = "top";
+          currentPairIndex++;
+        }
       }
-      const uploaded = await buildUploadedImage(file);
-      setPhotoAt(pairIndex, slot, uploaded);
     },
-    [setPhotoAt],
+    [addPhotoPair, setPhotoAt],
   );
 
   const handleFileInput = useCallback(
     async (event: ChangeEvent<HTMLInputElement>, pairIndex: number, slot: SlotKind) => {
-      const [file] = Array.from(event.target.files ?? []);
-      await assignImage(pairIndex, slot, file);
+      const files = Array.from(event.target.files ?? []);
+      await assignImages(pairIndex, slot, files);
       event.target.value = "";
     },
-    [assignImage],
+    [assignImages],
   );
 
   const handleDrop = useCallback(
     async (event: DragEvent<HTMLLabelElement>, pairIndex: number, slot: SlotKind) => {
       event.preventDefault();
       setDragTarget(null);
-      const [file] = Array.from(event.dataTransfer.files ?? []);
-      await assignImage(pairIndex, slot, file);
+      const files = Array.from(event.dataTransfer.files ?? []);
+      await assignImages(pairIndex, slot, files);
     },
-    [assignImage],
+    [assignImages],
   );
 
   const handleDragOver = useCallback((event: DragEvent<HTMLLabelElement>, pairIndex: number, slot: SlotKind) => {
@@ -186,6 +206,7 @@ const mediaModal = !isModalOpen
                             <input
                               type="file"
                               accept={ACCEPTED_TYPES.join(",")}
+                              multiple
                               className="hidden"
                               onChange={(event) => void handleFileInput(event, index, "top")}
                             />
@@ -219,6 +240,7 @@ const mediaModal = !isModalOpen
                             <input
                               type="file"
                               accept={ACCEPTED_TYPES.join(",")}
+                              multiple
                               className="hidden"
                               onChange={(event) => void handleFileInput(event, index, "bottom")}
                             />
