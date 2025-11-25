@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import path from "node:path";
 import os from "node:os";
-import fs from "node:fs/promises";
+import fs, { readdir } from "node:fs/promises";
 import { spawn } from "node:child_process";
 import { renderMediaOnLambda, getRenderProgress } from "@remotion/lambda/client";
 import { uploadBase64ToS3 } from "@/lib/s3-upload";
@@ -82,6 +82,24 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
 
     // --- PREPARE ASSETS ---
     let audioDataUrl: string | null = null;
+
+    // --- DEFAULT MUSIC LOGIC ---
+    if (!payload.audioPreset && !payload.audio) {
+      try {
+        const musicDir = path.join(process.cwd(), "public", "slideshow-music-library");
+        const files = await readdir(musicDir);
+        const supportedExts = [".mp3", ".m4a", ".aac", ".wav", ".ogg", ".flac"];
+        const musicFiles = files.filter(f => supportedExts.includes(path.extname(f).toLowerCase()));
+
+        if (musicFiles.length > 0) {
+          const randomFile = musicFiles[Math.floor(Math.random() * musicFiles.length)];
+          console.log(`[API] No audio provided. Defaulting to random music: ${randomFile}`);
+          payload.audioPreset = randomFile;
+        }
+      } catch (err) {
+        console.warn("[API] Failed to select random default music:", err);
+      }
+    }
 
     if (payload.audioPreset) {
       const presetPath = path.join(process.cwd(), "public", "slideshow-music-library", path.basename(payload.audioPreset));
