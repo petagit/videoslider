@@ -72,19 +72,25 @@ const Slide: React.FC<{
     src: string;
 }> = ({ src }) => {
     const [backgroundColor, setBackgroundColor] = useState("black");
-    const [handle] = useState(() => delayRender());
+    const [handle] = useState(() => delayRender("extract-color"));
 
     useEffect(() => {
         let mounted = true;
+        let timeoutId: NodeJS.Timeout;
+
         const getColor = async () => {
             try {
                 const img = new Image();
-                img.crossOrigin = "Anonymous";
+                // Only set crossOrigin for remote URLs (http/https)
+                // Local file:// or blob: URLs might fail with it
+                if (src.startsWith("http") || src.startsWith("//")) {
+                    img.crossOrigin = "Anonymous";
+                }
                 img.src = src;
                 
                 await new Promise((resolve, reject) => {
                     img.onload = resolve;
-                    img.onerror = reject;
+                    img.onerror = (e) => reject(new Error(`Failed to load image`));
                 });
 
                 if (!mounted) return;
@@ -99,16 +105,25 @@ const Slide: React.FC<{
                     setBackgroundColor(`rgb(${r}, ${g}, ${b})`);
                 }
             } catch (e) {
-                console.error("Failed to extract color", e);
+                console.warn("Failed to extract color for slide, defaulting to black", e);
             } finally {
                 if (mounted) continueRender(handle);
             }
         };
         
+        // Safety timeout: if image loading hangs for > 5s, proceed anyway
+        timeoutId = setTimeout(() => {
+             if (mounted) {
+                 console.warn("Image color extraction timed out, continuing render");
+                 continueRender(handle);
+             }
+        }, 5000);
+
         getColor();
 
         return () => {
             mounted = false;
+            clearTimeout(timeoutId);
         };
     }, [handle, src]);
 
