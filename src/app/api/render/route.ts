@@ -175,6 +175,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
         composition: compositionId,
         inputProps: finalPayload,
         codec: "h264",
+        envVariables: {},
       });
 
       console.log(`[API] Render started. ID: ${renderId}, Bucket: ${bucketName}`);

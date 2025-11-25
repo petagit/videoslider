@@ -106,6 +106,7 @@ async function test() {
                 functionName,
                 serveUrl,
                 inputProps: {},
+                envVariables: {},
             });
             console.log(`✅ Compositions found: ${comps.map(c => c.id).join(", ")}`);
 
@@ -180,6 +181,46 @@ async function test() {
         }
     } catch (e: any) {
         console.error("❌ Direct Invocation failed:", e.message);
+    }
+    // 6. Fetch CloudWatch Logs
+    console.log("\n📜 Fetching CloudWatch Logs...");
+    try {
+        const { CloudWatchLogsClient, DescribeLogStreamsCommand, GetLogEventsCommand } = await import("@aws-sdk/client-cloudwatch-logs");
+        const cwl = new CloudWatchLogsClient({
+            region,
+            credentials: {
+                accessKeyId: process.env.REMOTION_AWS_ACCESS_KEY_ID!,
+                secretAccessKey: process.env.REMOTION_AWS_SECRET_ACCESS_KEY!,
+            }
+        });
+
+        const logGroupName = `/aws/lambda/${functionName}`;
+        const streams = await cwl.send(new DescribeLogStreamsCommand({
+            logGroupName,
+            orderBy: "LastEventTime",
+            descending: true,
+            limit: 1,
+        }));
+
+        if (streams.logStreams && streams.logStreams.length > 0) {
+            const streamName = streams.logStreams[0].logStreamName;
+            console.log(`   Log Stream: ${streamName}`);
+            const events = await cwl.send(new GetLogEventsCommand({
+                logGroupName,
+                logStreamName: streamName,
+                limit: 20,
+            }));
+
+            console.log("   --- LOGS ---");
+            events.events?.forEach(e => {
+                console.log(`   [${new Date(e.timestamp!).toISOString()}] ${e.message?.trim()}`);
+            });
+            console.log("   --- END LOGS ---");
+        } else {
+            console.log("   No log streams found.");
+        }
+    } catch (e: any) {
+        console.error("❌ Failed to fetch logs:", e.message);
     }
 }
 
