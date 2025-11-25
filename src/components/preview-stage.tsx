@@ -117,16 +117,20 @@ export function PreviewStage() {
     return `${overlay.borderWidthPx}px ${overlay.borderColor}`;
   }, [overlay.borderColor, overlay.borderStyle, overlay.borderWidthPx]);
 
-  const components = useMemo<MarkdownComponents>(() => ({
-    h1: ({ node: _n, ref: _r, ...props }) => <h1 style={{ WebkitTextStroke: textStroke }} {...props} />,
-    h2: ({ node: _n, ref: _r, ...props }) => <h2 style={{ WebkitTextStroke: textStroke }} {...props} />,
-    h3: ({ node: _n, ref: _r, ...props }) => <h3 style={{ WebkitTextStroke: textStroke }} {...props} />,
-    h4: ({ node: _n, ref: _r, ...props }) => <h4 style={{ WebkitTextStroke: textStroke }} {...props} />,
-    p: ({ node: _n, ref: _r, ...props }) => <p style={{ WebkitTextStroke: textStroke }} {...props} />,
-    ul: ({ node: _n, ref: _r, ...props }) => <ul style={{ WebkitTextStroke: textStroke }} {...props} />,
-    ol: ({ node: _n, ref: _r, ...props }) => <ol style={{ WebkitTextStroke: textStroke }} {...props} />,
-    a: ({ node: _n, ref: _r, ...props }) => <a style={{ WebkitTextStroke: textStroke }} {...props} />,
-  }), [textStroke]);
+  const components = useMemo<MarkdownComponents>(() => {
+    /* eslint-disable @typescript-eslint/no-unused-vars */
+    return {
+      h1: ({ node: _n, ref: _r, ...props }) => <h1 style={{ WebkitTextStroke: textStroke }} {...props} />,
+      h2: ({ node: _n, ref: _r, ...props }) => <h2 style={{ WebkitTextStroke: textStroke }} {...props} />,
+      h3: ({ node: _n, ref: _r, ...props }) => <h3 style={{ WebkitTextStroke: textStroke }} {...props} />,
+      h4: ({ node: _n, ref: _r, ...props }) => <h4 style={{ WebkitTextStroke: textStroke }} {...props} />,
+      p: ({ node: _n, ref: _r, ...props }) => <p style={{ WebkitTextStroke: textStroke }} {...props} />,
+      ul: ({ node: _n, ref: _r, ...props }) => <ul style={{ WebkitTextStroke: textStroke }} {...props} />,
+      ol: ({ node: _n, ref: _r, ...props }) => <ol style={{ WebkitTextStroke: textStroke }} {...props} />,
+      a: ({ node: _n, ref: _r, ...props }) => <a style={{ WebkitTextStroke: textStroke }} {...props} />,
+    };
+    /* eslint-enable @typescript-eslint/no-unused-vars */
+  }, [textStroke]);
 
   return (
     <div className="flex h-full flex-col gap-4 overflow-hidden bg-white p-4 transition-colors dark:bg-slate-900">

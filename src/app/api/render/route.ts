@@ -4,12 +4,8 @@ import os from "node:os";
 import fs from "node:fs/promises";
 import { spawn } from "node:child_process";
 
-import type { SliderCompositionProps } from "../../../../remotion/SliderComposition";
-
 export const dynamic = "force-dynamic";
 export const maxDuration = 300;
-
-const DEFAULT_VIDEO_NAME = "slider-reveal-tiktok.mp4";
 
 export async function POST(request: NextRequest): Promise<NextResponse> {
   try {

@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+/* eslint-disable @typescript-eslint/no-require-imports */
 // Minimal Node renderer to decouple heavy deps from Next bundler
 const path = require('node:path');
 const os = require('node:os');

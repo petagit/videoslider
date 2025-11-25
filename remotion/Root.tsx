@@ -1,6 +1,6 @@
 import { Composition } from "remotion";
 import { SliderComposition, type SliderCompositionProps } from "./SliderComposition";
-import { SlideshowComposition } from "./SlideshowComposition";
+import { SlideshowComposition, type SlideshowCompositionProps } from "./SlideshowComposition";
 
 const defaultOverlay: SliderCompositionProps["overlay"] = {
   markdown: "## Overlay headline\nExplain your comparison with Markdown.",
@@ -25,7 +25,7 @@ const defaultAnimation: SliderCompositionProps["animation"] = {
 
 export const RemotionRoot: React.FC = () => (
   <>
-    <Composition
+    <Composition<SliderCompositionProps>
       id="slider-reveal"
       component={SliderComposition}
       // TikTok 9:16 portrait, safe zone 1080x1920
@@ -41,7 +41,7 @@ export const RemotionRoot: React.FC = () => (
         animation: defaultAnimation,
       }}
     />
-    <Composition
+    <Composition<SlideshowCompositionProps>
       id="slideshow"
       component={SlideshowComposition}
       durationInFrames={30 * 5} // Default placeholder duration
@@ -52,7 +52,7 @@ export const RemotionRoot: React.FC = () => (
         images: [],
         durationPerSlide: 1.5,
       }}
-      calculateMetadata={({ props }: { props: import("./SlideshowComposition").SlideshowCompositionProps }) => {
+      calculateMetadata={({ props }: { props: SlideshowCompositionProps }) => {
         const fps = 30;
         const durationPerSlide = props.durationPerSlide ?? 1.5;
         const count = props.images?.length ?? 0;

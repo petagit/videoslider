@@ -1,33 +1,59 @@
-import type { FC, ReactNode } from "react";
+import type {
+  FC,
+  ReactNode,
+  CSSProperties,
+  DetailedHTMLProps,
+  ImgHTMLAttributes,
+} from "react";
+
+type CompositionMetadata = {
+  durationInFrames?: number;
+  fps?: number;
+  width?: number;
+  height?: number;
+};
+
+type CompositionProps<T extends object = Record<string, unknown>> = {
+  id: string;
+  component: FC<T>;
+  durationInFrames: number;
+  fps: number;
+  width: number;
+  height: number;
+  defaultProps?: Partial<T>;
+  calculateMetadata?: (options: { props: T }) => CompositionMetadata | Promise<CompositionMetadata>;
+};
 
 declare module "remotion" {
-  export const AbsoluteFill: FC<{ style?: React.CSSProperties; children?: ReactNode }>;
-  export const Audio: FC<{ 
-    src: string; 
-    volume?: number; 
-    startFrom?: number; 
-    endAt?: number; 
-    muted?: boolean; 
-    loop?: boolean; 
+  export const AbsoluteFill: FC<{ style?: CSSProperties; children?: ReactNode }>;
+  export const Audio: FC<{
+    src: string;
+    volume?: number;
+    startFrom?: number;
+    endAt?: number;
+    muted?: boolean;
+    loop?: boolean;
     playbackRate?: number;
     trimBefore?: number; // Legacy or custom
     trimAfter?: number; // Legacy or custom
     useWebAudioApi?: boolean;
   }>;
-  export const Img: FC<React.DetailedHTMLProps<React.ImgHTMLAttributes<HTMLImageElement>, HTMLImageElement> & { src: string }>;
-  export const Sequence: FC<{ from: number; durationInFrames?: number; layout?: "absolute-fill" | "none"; style?: React.CSSProperties; children?: ReactNode; name?: string }>;
-  export const Composition: FC<{
-    id: string;
-    component: FC<any>;
-    durationInFrames: number;
-    fps: number;
-    width: number;
-    height: number;
-    defaultProps?: Record<string, unknown>;
-    calculateMetadata?: (props: { props: any }) => any;
+  export const Img: FC<
+    DetailedHTMLProps<ImgHTMLAttributes<HTMLImageElement>, HTMLImageElement> & { src: string }
+  >;
+  export const Sequence: FC<{
+    from: number;
+    durationInFrames?: number;
+    layout?: "absolute-fill" | "none";
+    style?: CSSProperties;
+    children?: ReactNode;
+    name?: string;
   }>;
-  
-  export function registerRoot(comp: FC<any>): void;
+  export function Composition<T extends object = Record<string, unknown>>(
+    props: CompositionProps<T>
+  ): ReactNode;
+
+  export function registerRoot(root: FC): void;
   export function useVideoConfig(): {
     durationInFrames: number;
     width: number;

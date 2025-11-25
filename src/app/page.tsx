@@ -1,4 +1,3 @@
-import Link from "next/link";
 import { ExportPanel } from "../components/export-panel";
 import { MediaPanel } from "../components/media-panel";
 import { OverlayPanel } from "../components/overlay-panel";

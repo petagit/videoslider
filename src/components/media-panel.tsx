@@ -73,7 +73,6 @@ export function MediaPanel() {
     () => photoPairs.filter((pair) => pair.top && pair.bottom).length,
     [photoPairs],
   );
-  const truncatedPairCount = Math.max(0, photoPairs.length - displayPairs.length);
   const activePairNumber = photoPairs.length > 0 ? Math.min(activePairIndex, photoPairs.length - 1) + 1 : 1;
 
   const assignImage = useCallback(
