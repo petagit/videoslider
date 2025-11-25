@@ -12,11 +12,17 @@ export async function uploadBase64ToS3(
   base64Str: string,
   filename: string
 ): Promise<string> {
-  const matches = base64Str.match(/^data:([A-Za-z-+\/]+);base64,(.+)$/);
+  // Use a more permissive regex or simple string splitting
+  const matches = base64Str.match(/^data:([^;]+);base64,(.+)$/);
   if (!matches || matches.length !== 3) {
     // If it's already a URL, return it
     if (base64Str.startsWith("http")) return base64Str;
-    throw new Error("Invalid base64 string");
+    
+    // Debug logging
+    const snippet = base64Str.length > 50 ? base64Str.substring(0, 50) + "..." : base64Str;
+    console.error(`Invalid base64 string for file ${filename}. Length: ${base64Str.length}. Snippet: ${snippet}`);
+    
+    throw new Error(`Invalid base64 string for ${filename}`);
   }
 
   const contentType = matches[1];

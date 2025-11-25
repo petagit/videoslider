@@ -97,7 +97,7 @@ export default function SlideshowPage() {
         });
     };
 
-    const handleGenerate = async () => {
+    const handleGenerate = async (renderMode: 'lambda' | 'local' = 'lambda') => {
         setIsGenerating(true);
         setVideoUrl(null);
         setCdnUrl(null);
@@ -122,6 +122,7 @@ export default function SlideshowPage() {
                     animation: { frameRate: 30 },
                     audioPreset: selectedMusic,
                     audio: audioDataUrl,
+                    renderMode,
                 }),
             });
 
@@ -141,9 +142,9 @@ export default function SlideshowPage() {
 
     const handleUploadToCdn = async () => {
         if (!videoUrl) return;
-        
+
         setIsCdnUploading(true);
-        
+
         // Simulate upload delay
         setTimeout(() => {
             const absoluteUrl = window.location.origin + videoUrl;
@@ -182,12 +183,11 @@ export default function SlideshowPage() {
                             </button>
                         </header>
 
-                        <div 
-                            className={`relative flex flex-col items-center justify-center rounded-xl border border-dashed p-6 transition-colors ${
-                                dragActive 
-                                    ? "border-sky-400 bg-sky-500/10" 
-                                    : "border-slate-300 bg-slate-50 hover:border-slate-400 dark:border-slate-700 dark:bg-slate-950/50 dark:hover:border-slate-600"
-                            }`}
+                        <div
+                            className={`relative flex flex-col items-center justify-center rounded-xl border border-dashed p-6 transition-colors ${dragActive
+                                ? "border-sky-400 bg-sky-500/10"
+                                : "border-slate-300 bg-slate-50 hover:border-slate-400 dark:border-slate-700 dark:bg-slate-950/50 dark:hover:border-slate-600"
+                                }`}
                             onDragEnter={handleDrag}
                             onDragLeave={handleDrag}
                             onDragOver={handleDrag}
@@ -205,7 +205,7 @@ export default function SlideshowPage() {
                                 <p className="text-[10px] uppercase tracking-wider text-slate-400 dark:text-slate-500 mt-1">or click to browse</p>
                             </div>
                         </div>
-                        
+
                         {images.length > 0 && (
                             <div className="mt-4 grid grid-cols-4 gap-2">
                                 {images.map((img, i) => (
@@ -256,7 +256,7 @@ export default function SlideshowPage() {
                                 <span className="text-[11px] font-semibold uppercase tracking-[0.25em] text-slate-600 dark:text-slate-400">
                                     Background Music
                                 </span>
-                                
+
                                 {/* Upload Music */}
                                 <label className="flex cursor-pointer items-center gap-2 rounded-lg border border-dashed border-slate-300 bg-slate-50 p-2 hover:bg-slate-100 dark:border-slate-700 dark:bg-slate-950/50 dark:hover:bg-slate-900/50">
                                     <input
@@ -283,11 +283,10 @@ export default function SlideshowPage() {
                                             <button
                                                 key={preset.id}
                                                 onClick={() => handlePresetSelect(preset.filename)}
-                                                className={`w-full truncate rounded-lg border px-3 py-2 text-left text-xs transition-colors ${
-                                                    selectedMusic === preset.filename
-                                                        ? "border-sky-400 bg-sky-500/20 text-sky-700 dark:text-sky-100"
-                                                        : "border-slate-200 bg-white text-slate-600 hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-950/40 dark:text-slate-300 dark:hover:bg-slate-900"
-                                                }`}
+                                                className={`w-full truncate rounded-lg border px-3 py-2 text-left text-xs transition-colors ${selectedMusic === preset.filename
+                                                    ? "border-sky-400 bg-sky-500/20 text-sky-700 dark:text-sky-100"
+                                                    : "border-slate-200 bg-white text-slate-600 hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-950/40 dark:text-slate-300 dark:hover:bg-slate-900"
+                                                    }`}
                                             >
                                                 {preset.name}
                                             </button>
@@ -307,16 +306,25 @@ export default function SlideshowPage() {
                             <h2 className="text-xs font-semibold uppercase tracking-[0.2em] text-slate-800 dark:text-slate-300">Export</h2>
                             <p className="text-[11px] text-slate-600 dark:text-slate-400">Render and download.</p>
                         </header>
-                        
-                        <button
-                            onClick={handleGenerate}
-                            disabled={isGenerating || images.length === 0}
-                            className="w-full inline-flex items-center justify-center rounded-full bg-sky-500/15 px-4 py-3 text-[11px] font-semibold uppercase tracking-[0.3em] text-sky-700 shadow-inner shadow-sky-500/20 transition hover:bg-sky-500/25 disabled:cursor-not-allowed disabled:opacity-60 dark:bg-sky-500/10 dark:text-sky-100 dark:hover:bg-sky-500/20"
-                        >
-                            {isGenerating ? "Generating..." : "Generate Video"}
-                        </button>
 
-                         {videoUrl && (
+                        <div className="flex flex-col gap-2">
+                            <button
+                                onClick={() => handleGenerate('lambda')}
+                                disabled={isGenerating || images.length === 0}
+                                className="w-full inline-flex items-center justify-center rounded-full bg-sky-500/15 px-4 py-3 text-[11px] font-semibold uppercase tracking-[0.3em] text-sky-700 shadow-inner shadow-sky-500/20 transition hover:bg-sky-500/25 disabled:cursor-not-allowed disabled:opacity-60 dark:bg-sky-500/10 dark:text-sky-100 dark:hover:bg-sky-500/20"
+                            >
+                                {isGenerating ? "Generating..." : "Render with Lambda"}
+                            </button>
+                            <button
+                                onClick={() => handleGenerate('local')}
+                                disabled={isGenerating || images.length === 0}
+                                className="w-full inline-flex items-center justify-center rounded-full border border-slate-200 bg-white px-4 py-3 text-[11px] font-semibold uppercase tracking-[0.3em] text-slate-600 transition hover:bg-slate-50 hover:text-slate-900 disabled:cursor-not-allowed disabled:opacity-60 dark:border-slate-800 dark:bg-transparent dark:text-slate-400 dark:hover:bg-slate-800 dark:hover:text-slate-200"
+                            >
+                                {isGenerating ? "Generating..." : "Render Locally"}
+                            </button>
+                        </div>
+
+                        {videoUrl && (
                             <div className="mt-4 space-y-3 animate-in fade-in slide-in-from-top-2">
                                 <div className="rounded-lg border border-emerald-200 bg-emerald-50 p-3 text-center dark:border-emerald-900/50 dark:bg-emerald-900/20">
                                     <p className="text-xs font-medium text-emerald-700 dark:text-emerald-300">Video Ready!</p>
@@ -337,18 +345,18 @@ export default function SlideshowPage() {
                                         {isCdnUploading ? "Uploading..." : "Upload to CDN"}
                                     </button>
                                 </div>
-                                
+
                                 {cdnUrl && (
                                     <div className="rounded-lg border border-slate-200 bg-slate-50 p-2 dark:border-slate-700 dark:bg-slate-900">
                                         <p className="mb-1 text-[10px] font-medium uppercase text-slate-500">CDN Link</p>
                                         <div className="flex gap-1">
-                                            <input 
-                                                readOnly 
-                                                value={cdnUrl} 
+                                            <input
+                                                readOnly
+                                                value={cdnUrl}
                                                 className="flex-1 rounded border border-slate-300 bg-white px-2 py-1 text-xs text-slate-600 focus:border-sky-500 focus:outline-none dark:border-slate-600 dark:bg-slate-800 dark:text-slate-300"
                                                 onClick={(e) => e.currentTarget.select()}
                                             />
-                                            <button 
+                                            <button
                                                 onClick={() => navigator.clipboard.writeText(cdnUrl)}
                                                 className="rounded border border-slate-300 bg-white px-2 py-1 text-xs font-medium text-slate-600 hover:bg-slate-50 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-300 dark:hover:bg-slate-700"
                                             >

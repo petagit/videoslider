@@ -5,6 +5,7 @@ import fs from "node:fs/promises";
 import { spawn } from "node:child_process";
 import { renderMediaOnLambda, getRenderProgress } from "@remotion/lambda/client";
 import { uploadBase64ToS3 } from "@/lib/s3-upload";
+import { AwsRegion } from "@remotion/lambda";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 300;
@@ -23,10 +24,10 @@ async function saveBase64ToFile(base64Str: string, tmpDir: string, prefix: strin
   let ext = type.split('/')[1] || 'bin';
   if (ext === 'mpeg') ext = 'mp3';
   if (ext === 'svg+xml') ext = 'svg';
-  
+
   const filename = `${prefix}-${Date.now()}-${Math.random().toString(36).slice(2)}.${ext}`;
   const filePath = path.join(tmpDir, filename);
-  
+
   await fs.writeFile(filePath, buffer);
   // Return absolute file URL
   return `file://${filePath}`;
@@ -48,7 +49,7 @@ async function resolveAsset(
       let ext = type.split('/')[1] || 'bin';
       if (ext === 'mpeg') ext = 'mp3';
       if (ext === 'svg+xml') ext = 'svg';
-      
+
       const filename = `${prefix}-${Date.now()}-${Math.random().toString(36).slice(2)}.${ext}`;
       return await uploadBase64ToS3(asset, filename);
     }
@@ -65,10 +66,15 @@ async function resolveAsset(
 export async function POST(request: NextRequest): Promise<NextResponse> {
   try {
     const body = await request.json();
-    const { compositionId = "slider-reveal", ...payload } = body;
+    const { compositionId = "slider-reveal", renderMode, ...payload } = body;
 
-    const useLambda = !!process.env.REMOTION_LAMBDA_FUNCTION_NAME;
-    
+    // Determine render mode: 'lambda', 'local', or auto-detect
+    const useLambda = renderMode === 'lambda'
+      ? true
+      : renderMode === 'local'
+        ? false
+        : !!process.env.REMOTION_LAMBDA_FUNCTION_NAME;
+
     let tmpDir = "";
     if (!useLambda) {
       tmpDir = await fs.mkdtemp(path.join(os.tmpdir(), "slider-render-"));
@@ -78,68 +84,68 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     let audioDataUrl: string | null = null;
 
     if (payload.audioPreset) {
-       const presetPath = path.join(process.cwd(), "public", "slideshow-music-library", path.basename(payload.audioPreset));
-       if (useLambda) {
-         // Read file and upload to S3
-         const fileBuffer = await fs.readFile(presetPath);
-         const base64 = `data:audio/mp3;base64,${fileBuffer.toString("base64")}`;
-         const filename = `preset-${path.basename(payload.audioPreset)}`;
-         audioDataUrl = await uploadBase64ToS3(base64, filename);
-       } else {
-         audioDataUrl = `file://${presetPath}`;
-       }
+      const presetPath = path.join(process.cwd(), "public", "slideshow-music-library", path.basename(payload.audioPreset));
+      if (useLambda) {
+        // Read file and upload to S3
+        const fileBuffer = await fs.readFile(presetPath);
+        const base64 = `data:audio/mp3;base64,${fileBuffer.toString("base64")}`;
+        const filename = `preset-${path.basename(payload.audioPreset)}`;
+        audioDataUrl = await uploadBase64ToS3(base64, filename);
+      } else {
+        audioDataUrl = `file://${presetPath}`;
+      }
     } else if (payload.audio) {
-       if (useLambda) {
-          if (payload.audio.startsWith("data:")) {
-             audioDataUrl = await resolveAsset(payload.audio, tmpDir, "audio", true);
-          } else {
-             audioDataUrl = payload.audio;
+      if (useLambda) {
+        if (payload.audio.startsWith("data:")) {
+          audioDataUrl = await resolveAsset(payload.audio, tmpDir, "audio", true);
+        } else {
+          audioDataUrl = payload.audio;
+        }
+      } else {
+        // Existing logic for local
+        if (payload.audio.startsWith('data:')) {
+          audioDataUrl = await saveBase64ToFile(payload.audio, tmpDir, 'audio');
+        } else if (/^https?:\/\//i.test(payload.audio)) {
+          // Remote URL - download it for local render
+          try {
+            const res = await fetch(payload.audio);
+            const arrayBuffer = await res.arrayBuffer();
+            const buffer = Buffer.from(arrayBuffer);
+            const mime = res.headers.get("content-type") ?? "audio/mpeg";
+            let ext = "mp3";
+            if (mime.includes("wav")) ext = "wav";
+
+            const filename = `downloaded-audio.${ext}`;
+            const filePath = path.join(tmpDir, filename);
+            await fs.writeFile(filePath, buffer);
+            audioDataUrl = `file://${filePath}`;
+          } catch (e) {
+            console.warn("Failed to download remote audio", e);
+            audioDataUrl = null;
           }
-       } else {
-          // Existing logic for local
-          if (payload.audio.startsWith('data:')) {
-            audioDataUrl = await saveBase64ToFile(payload.audio, tmpDir, 'audio');
-          } else if (/^https?:\/\//i.test(payload.audio)) {
-            // Remote URL - download it for local render
-             try {
-                const res = await fetch(payload.audio);
-                const arrayBuffer = await res.arrayBuffer();
-                const buffer = Buffer.from(arrayBuffer);
-                const mime = res.headers.get("content-type") ?? "audio/mpeg";
-                let ext = "mp3";
-                if (mime.includes("wav")) ext = "wav";
-                
-                const filename = `downloaded-audio.${ext}`;
-                const filePath = path.join(tmpDir, filename);
-                await fs.writeFile(filePath, buffer);
-                audioDataUrl = `file://${filePath}`;
-              } catch (e) {
-                  console.warn("Failed to download remote audio", e);
-                audioDataUrl = null;
-              }
-          } else {
-            audioDataUrl = payload.audio;
-          }
-       }
+        } else {
+          audioDataUrl = payload.audio;
+        }
+      }
     }
 
     // Process Images
     if (payload.images && Array.isArray(payload.images)) {
-      payload.images = await Promise.all(payload.images.map((img: string, i: number) => 
+      payload.images = await Promise.all(payload.images.map((img: string, i: number) =>
         resolveAsset(img, tmpDir, `slide-${i}`, useLambda)
       ));
     }
 
     if (payload.topImages && Array.isArray(payload.topImages)) {
-        payload.topImages = await Promise.all(payload.topImages.map((img: string, i: number) => 
-          resolveAsset(img, tmpDir, `top-${i}`, useLambda)
-        ));
+      payload.topImages = await Promise.all(payload.topImages.map((img: string, i: number) =>
+        resolveAsset(img, tmpDir, `top-${i}`, useLambda)
+      ));
     }
 
     if (payload.bottomImages && Array.isArray(payload.bottomImages)) {
-        payload.bottomImages = await Promise.all(payload.bottomImages.map((img: string, i: number) => 
-          resolveAsset(img, tmpDir, `bottom-${i}`, useLambda)
-        ));
+      payload.bottomImages = await Promise.all(payload.bottomImages.map((img: string, i: number) =>
+        resolveAsset(img, tmpDir, `bottom-${i}`, useLambda)
+      ));
     }
 
     const finalPayload = { ...payload, audio: audioDataUrl };
@@ -147,14 +153,21 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     // --- EXECUTE RENDER ---
 
     if (useLambda) {
-      const region = process.env.REMOTION_AWS_REGION || "us-east-1";
+      const region = (process.env.REMOTION_AWS_REGION || "us-east-1") as AwsRegion;
       const functionName = process.env.REMOTION_LAMBDA_FUNCTION_NAME!;
       const serveUrl = process.env.REMOTION_LAMBDA_SERVE_URL!;
-      
+
+      // Ensure standard AWS env vars are set for the SDK
+      if (!process.env.AWS_ACCESS_KEY_ID) process.env.AWS_ACCESS_KEY_ID = process.env.REMOTION_AWS_ACCESS_KEY_ID;
+      if (!process.env.AWS_SECRET_ACCESS_KEY) process.env.AWS_SECRET_ACCESS_KEY = process.env.REMOTION_AWS_SECRET_ACCESS_KEY;
+      if (!process.env.AWS_REGION) process.env.AWS_REGION = region;
+
       // Determine props based on composition
       // We need to map payload to props expected by composition
       // The payload structure seems to match props mostly.
-      
+
+      console.log(`[API] Starting Lambda render: ${compositionId} on ${functionName}`);
+
       const { renderId, bucketName } = await renderMediaOnLambda({
         region,
         functionName,
@@ -163,6 +176,8 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
         inputProps: finalPayload,
         codec: "h264",
       });
+
+      console.log(`[API] Render started. ID: ${renderId}, Bucket: ${bucketName}`);
 
       // Poll for progress
       while (true) {
@@ -174,10 +189,14 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
           functionName,
         });
 
+        // console.log(`[API] Progress: ${JSON.stringify(progress)}`);
+
         if (progress.done) {
+          console.log(`[API] Render done: ${progress.outputFile}`);
           return NextResponse.json({ url: progress.outputFile });
         }
         if (progress.fatalErrorEncountered) {
+          console.error(`[API] Fatal error:`, progress.errors);
           throw new Error(progress.errors[0].message);
         }
       }
@@ -208,10 +227,10 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
         child.on("close", (code: number) => {
           if (code === 0) {
             const lastLine = stdout.trim().split("\n").pop() ?? "";
-            if (lastLine.startsWith("/") || lastLine.match(/^[a-zA-Z]:\\/)) { 
+            if (lastLine.startsWith("/") || lastLine.match(/^[a-zA-Z]:\\/)) {
               resolve(lastLine);
             } else {
-               resolve(lastLine);
+              resolve(lastLine);
             }
           } else {
             reject(new Error(`Render process exited with code ${code}: ${stderr}`));
