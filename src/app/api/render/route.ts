@@ -198,27 +198,16 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
 
       console.log(`[API] Render started. ID: ${renderId}, Bucket: ${bucketName}`);
 
-      // Poll for progress
-      while (true) {
-        await new Promise((resolve) => setTimeout(resolve, 2000));
-        const progress = await getRenderProgress({
-          region,
-          bucketName,
-          renderId,
-          functionName,
-        });
+      console.log(`[API] Render started. ID: ${renderId}, Bucket: ${bucketName}`);
 
-        // console.log(`[API] Progress: ${JSON.stringify(progress)}`);
+      return NextResponse.json({
+        type: 'lambda',
+        renderId,
+        bucketName,
+        functionName,
+        region,
+      });
 
-        if (progress.done) {
-          console.log(`[API] Render done: ${progress.outputFile}`);
-          return NextResponse.json({ url: progress.outputFile });
-        }
-        if (progress.fatalErrorEncountered) {
-          console.error(`[API] Fatal error:`, progress.errors);
-          throw new Error(progress.errors[0].message);
-        }
-      }
 
     } else {
       // --- LOCAL RENDER LOGIC ---
