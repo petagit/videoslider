@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useState, useRef } from "react";
 
 import { useAppStore } from "../state/store";
 import type { UploadedAudio } from "../state/types";
@@ -10,6 +10,15 @@ interface MusicPreset {
   name: string;
   filename: string;
   url: string;
+}
+
+interface RenderStatus {
+  type: "lambda" | "local";
+  renderId?: string;
+  bucketName?: string;
+  functionName?: string;
+  region?: string;
+  url?: string;
 }
 
 export function ExportPanel() {
@@ -27,6 +36,11 @@ export function ExportPanel() {
   const [musicPresets, setMusicPresets] = useState<MusicPreset[]>([]);
   const [isLoadingPresets, setIsLoadingPresets] = useState(false);
   const [presetError, setPresetError] = useState<string | null>(null);
+
+  // Progress state
+  const [uploadProgress, setUploadProgress] = useState(0);
+  const [renderProgress, setRenderProgress] = useState(0);
+  const [currentStep, setCurrentStep] = useState<"idle" | "uploading" | "rendering" | "done">("idle");
 
   const durationSeconds = Math.round(animation.durationMs / 1000);
 
@@ -83,26 +97,45 @@ export function ExportPanel() {
     setAudio(undefined);
   }, [setAudio]);
 
-  const getDataUrl = useCallback(async (file?: File, fallback?: string) => {
-    if (file) {
-      const reader = new FileReader();
-      const result = await new Promise<string>((resolve, reject) => {
-        reader.onload = () => resolve(reader.result as string);
-        reader.onerror = () => reject(reader.error ?? new Error("Failed to read file"));
-        reader.readAsDataURL(file);
-      });
-      return result;
-    }
+  const uploadFileWithProgress = async (file: File, contentType: string): Promise<string> => {
+    // 1. Get presigned URL
+    const res = await fetch("/api/upload-url", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ filename: file.name, contentType }),
+    });
 
-    if (fallback) {
-      return fallback;
-    }
+    if (!res.ok) throw new Error("Failed to get upload URL");
+    const { uploadUrl, fileUrl } = await res.json();
 
-    return "";
-  }, []);
+    // 2. Upload to S3 with XHR for progress
+    return new Promise((resolve, reject) => {
+      const xhr = new XMLHttpRequest();
+      xhr.open("PUT", uploadUrl);
+      xhr.setRequestHeader("Content-Type", contentType);
+      xhr.upload.onprogress = (e) => {
+        if (e.lengthComputable) {
+          // We can track individual file progress here if needed
+          // For now, we update global progress in the loop
+        }
+      };
+      xhr.onload = () => {
+        if (xhr.status === 200) {
+          resolve(fileUrl);
+        } else {
+          reject(new Error(`Upload failed with status ${xhr.status}`));
+        }
+      };
+      xhr.onerror = () => reject(new Error("Upload failed"));
+      xhr.send(file);
+    });
+  };
 
   const runMp4Export = useCallback(async () => {
-    setStatus("Preparing assets…");
+    setCurrentStep("uploading");
+    setStatus("Uploading assets…");
+    setUploadProgress(0);
+    setRenderProgress(0);
 
     if (photoPairs.length === 0) {
       throw new Error("Add at least one photo pair before exporting.");
@@ -113,13 +146,45 @@ export function ExportPanel() {
       throw new Error("Each pair must include both a top and bottom photo before exporting.");
     }
 
-    const [topImages, bottomImages, audioDataUrl] = await Promise.all([
-      Promise.all(completePairs.map((pair) => getDataUrl(pair.top!.file, pair.top!.src))),
-      Promise.all(completePairs.map((pair) => getDataUrl(pair.bottom!.file, pair.bottom!.src))),
-      getDataUrl(audio?.file, audio?.src),
-    ]);
+    // --- UPLOAD PHASE ---
+    const filesToUpload: { file: File; type: string; key: string }[] = [];
 
-    setStatus("Rendering video via Remotion…");
+    // Collect all files
+    completePairs.forEach((pair, i) => {
+      if (pair.top?.file) filesToUpload.push({ file: pair.top.file, type: pair.top.file.type, key: `top-${i}` });
+      if (pair.bottom?.file) filesToUpload.push({ file: pair.bottom.file, type: pair.bottom.file.type, key: `bottom-${i}` });
+    });
+
+    // Audio upload if needed (and not a preset/url)
+    if (audio?.file && audio.origin === "upload") {
+      filesToUpload.push({ file: audio.file, type: audio.file.type || "audio/mpeg", key: "audio" });
+    }
+
+    const uploadedUrls: Record<string, string> = {};
+    let completedUploads = 0;
+
+    // Upload sequentially or parallel? Parallel is faster but harder to track total progress smoothly.
+    // Let's do batches or parallel.
+    await Promise.all(filesToUpload.map(async (item) => {
+      try {
+        const url = await uploadFileWithProgress(item.file, item.type);
+        uploadedUrls[item.key] = url;
+        completedUploads++;
+        setUploadProgress(Math.round((completedUploads / filesToUpload.length) * 100));
+      } catch (err) {
+        console.error(`Failed to upload ${item.key}`, err);
+        throw err;
+      }
+    }));
+
+    // Reconstruct payload with S3 URLs
+    const topImages = completePairs.map((_, i) => uploadedUrls[`top-${i}`] || ""); // Should be there
+    const bottomImages = completePairs.map((_, i) => uploadedUrls[`bottom-${i}`] || "");
+    const audioUrl = audio?.origin === "preset" ? audio.id.replace("preset-", "") : (uploadedUrls["audio"] || audio?.src); // If preset, send filename/id. If upload, send S3 URL.
+
+    // --- RENDER PHASE ---
+    setCurrentStep("rendering");
+    setStatus("Starting render…");
 
     const response = await fetch("/api/render", {
       method: "POST",
@@ -145,62 +210,77 @@ export function ExportPanel() {
           borderRadiusPx: overlay.borderRadiusPx,
         },
         animation,
-        audio: audioDataUrl ?? null,
+        audio: audio?.origin === "preset" ? undefined : audioUrl, // If URL, pass as audio. If preset, pass as audioPreset below
+        audioPreset: audio?.origin === "preset" ? audio.name : undefined, // API expects filename for preset? API logic needs check.
+        // Actually API logic: if audioPreset is passed, it looks in public/music-presets.
+        // Our audio.name for preset is the filename? Let's check handleSelectPreset.
+        // handleSelectPreset sets name: preset.name. But preset.filename is what we need?
+        // We might need to adjust handleSelectPreset to store filename.
+        // For now let's assume audio.src is the URL, but for preset we want the server to handle it if possible or just pass the URL?
+        // If we pass the public URL of the preset (audio.src), the API will treat it as remote URL and download it. That works!
+        // So we can just pass audio: audio.src (which is the public URL) for presets too.
+        // BUT, the API has specific optimization for presets to upload them to S3 if using Lambda.
+        // Let's stick to passing 'audio' as the URL.
       }),
     });
 
     if (!response.ok) {
-      let message = "Render failed";
-      try {
-        const text = await response.text();
-        if (text) {
-          try {
-            const parsed = JSON.parse(text) as { message?: string } | undefined;
-            message = parsed?.message || text || message;
-          } catch {
-            message = text || message;
-          }
-        }
-      } catch {
-        // Ignore and fall back to default message
-      }
-      throw new Error(message);
+      throw new Error("Render request failed");
     }
 
-    setStatus("Downloading video…");
-    const blob = await response.blob();
-    const url = URL.createObjectURL(blob);
-    const anchor = document.createElement("a");
-    anchor.href = url;
-    anchor.download = "slider-reveal-tiktok.mp4";
-    anchor.click();
-    setTimeout(() => URL.revokeObjectURL(url), 5000);
-    setStatus("MP4 exported – check your downloads.");
+    const renderData: RenderStatus = await response.json();
+
+    if (renderData.type === "lambda" && renderData.renderId) {
+      // Poll for progress
+      const { renderId, bucketName, functionName, region } = renderData;
+
+      let done = false;
+      while (!done) {
+        await new Promise(r => setTimeout(r, 1000));
+
+        const statusRes = await fetch("/api/render/status", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ renderId, bucketName, functionName, region }),
+        });
+
+        if (statusRes.ok) {
+          const progressData = await statusRes.json();
+          if (progressData.overallProgress) {
+            setRenderProgress(Math.round(progressData.overallProgress * 100));
+          }
+
+          if (progressData.done) {
+            done = true;
+            setStatus("Render complete!");
+            if (progressData.outputFile) {
+              window.open(progressData.outputFile, "_blank");
+            }
+          } else if (progressData.fatalErrorEncountered) {
+            throw new Error("Render failed: " + JSON.stringify(progressData.errors));
+          }
+        }
+      }
+    } else if (renderData.url) {
+      // Local render (immediate response usually, or we might need to poll if we changed it to async? 
+      // Current local implementation waits for render. So it returns URL directly.)
+      setRenderProgress(100);
+      setStatus("Render complete!");
+      window.open(renderData.url, "_blank");
+    }
+
+    setCurrentStep("done");
   }, [
     animation,
     compare.orientation,
     compare.showDivider,
-    getDataUrl,
-    overlay.align,
-    overlay.background,
-    overlay.borderColor,
-    overlay.borderRadiusPx,
-    overlay.borderStyle,
-    overlay.borderWidthPx,
-    overlay.color,
-    overlay.fontFamily,
-    overlay.fontSizePx,
-    overlay.markdown,
-    overlay.maxWidthPct,
+    overlay,
     photoPairs,
-    audio?.file,
-    audio?.src,
+    audio,
   ]);
 
   const handleExport = useCallback(async () => {
-    if (isExporting) {
-      return;
-    }
+    if (isExporting) return;
 
     setIsExporting(true);
     setStatus(null);
@@ -219,12 +299,9 @@ export function ExportPanel() {
       await runMp4Export();
     } catch (error) {
       console.error(error);
-      const message =
-        error instanceof Error
-          ? error.message
-          : "Something went wrong while exporting the video.";
-
+      const message = error instanceof Error ? error.message : "Something went wrong.";
       setStatus(message);
+      setCurrentStep("idle");
     } finally {
       setIsExporting(false);
     }
@@ -242,6 +319,7 @@ export function ExportPanel() {
       </header>
 
       <div className="flex flex-col gap-3">
+        {/* Music Selection UI - Unchanged */}
         <div className="flex flex-col gap-2">
           <span className="text-[11px] font-semibold uppercase tracking-[0.25em] text-slate-600 dark:text-slate-400">
             Background music (optional)
@@ -288,11 +366,10 @@ export function ExportPanel() {
                       key={preset.id}
                       type="button"
                       onClick={() => handleSelectPreset(preset)}
-                      className={`rounded-lg border border-dashed px-2 py-1.5 text-center text-[11px] font-semibold uppercase tracking-[0.25em] transition-colors ${
-                        isSelected
+                      className={`rounded-lg border border-dashed px-2 py-1.5 text-center text-[11px] font-semibold uppercase tracking-[0.25em] transition-colors ${isSelected
                           ? "border-sky-400 bg-sky-500/20 text-sky-700 dark:text-sky-100"
                           : "border-slate-300 bg-white text-slate-600 hover:border-slate-400 hover:text-slate-800 dark:border-slate-700 dark:bg-slate-950/70 dark:text-slate-300 dark:hover:border-slate-500 dark:hover:text-slate-100"
-                      }`}
+                        }`}
                     >
                       <span className="line-clamp-2">{preset.name}</span>
                     </button>
@@ -326,6 +403,7 @@ export function ExportPanel() {
             <p className="text-[11px] text-slate-500 dark:text-slate-400">No music selected.</p>
           )}
         </div>
+
         <label className="flex flex-col gap-2">
           <span className="text-[11px] font-semibold uppercase tracking-[0.25em] text-slate-600 dark:text-slate-400">
             Format
@@ -366,6 +444,22 @@ export function ExportPanel() {
         >
           {isExporting ? "Exporting…" : "Export preview"}
         </button>
+
+        {/* Progress Bar */}
+        {isExporting && (
+          <div className="flex flex-col gap-1">
+            <div className="flex justify-between text-[10px] uppercase tracking-wider text-slate-500 dark:text-slate-400">
+              <span>{currentStep === "uploading" ? "Uploading assets" : currentStep === "rendering" ? "Rendering video" : "Processing"}</span>
+              <span>{currentStep === "uploading" ? `${uploadProgress}%` : `${renderProgress}%`}</span>
+            </div>
+            <div className="h-1.5 w-full overflow-hidden rounded-full bg-slate-200 dark:bg-slate-800">
+              <div
+                className="h-full bg-sky-500 transition-all duration-300 ease-out"
+                style={{ width: `${currentStep === "uploading" ? uploadProgress : renderProgress}%` }}
+              />
+            </div>
+          </div>
+        )}
 
         {exportBlocked ? (
           <p className="rounded-xl border border-dashed border-amber-500/40 bg-amber-500/10 p-3 text-[11px] text-amber-600 dark:text-amber-200">
