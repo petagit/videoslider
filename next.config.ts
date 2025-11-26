@@ -12,7 +12,6 @@ const nextConfig: NextConfig = {
         ],
       },
     },
-    root: "/Users/fengzhiping/video editor",
   },
   webpack: (config, { isServer }) => {
     if (isServer) {
