@@ -12,6 +12,20 @@ interface MusicPreset {
     url: string;
 }
 
+const getAudioDuration = (url: string): Promise<number> => {
+    return new Promise((resolve) => {
+        const audio = new Audio(url);
+        audio.onloadedmetadata = () => {
+            console.log("[SlideshowPage] Loaded duration:", audio.duration, "for", url);
+            resolve(audio.duration);
+        };
+        audio.onerror = (e) => {
+            console.error("[SlideshowPage] Failed to load audio duration for", url, e);
+            resolve(0);
+        };
+    });
+};
+
 export default function SlideshowPage() {
     const [images, setImages] = useState<string[]>([]);
     const [imageFiles, setImageFiles] = useState<File[]>([]);
@@ -22,6 +36,8 @@ export default function SlideshowPage() {
     const [selectedMusic, setSelectedMusic] = useState<string | null>(null);
     const [uploadedMusic, setUploadedMusic] = useState<string | null>(null);
     const [uploadedMusicFile, setUploadedMusicFile] = useState<File | null>(null);
+    const [audioLoop, setAudioLoop] = useState(true);
+    const [audioDuration, setAudioDuration] = useState<number | null>(null);
     const [dragActive, setDragActive] = useState(false);
     const [isCdnUploading, setIsCdnUploading] = useState(false);
     const [cdnUrl, setCdnUrl] = useState<string | null>(null);
@@ -79,7 +95,14 @@ export default function SlideshowPage() {
             const file = e.target.files[0];
             setUploadedMusic(URL.createObjectURL(file));
             setUploadedMusicFile(file);
+            setUploadedMusicFile(file);
             setSelectedMusic(null); // Deselect preset if custom music is uploaded
+
+            setUploadedMusicFile(file);
+            setSelectedMusic(null); // Deselect preset if custom music is uploaded
+
+            // Get duration
+            getAudioDuration(URL.createObjectURL(file)).then(setAudioDuration);
         }
     }, []);
 
@@ -90,6 +113,12 @@ export default function SlideshowPage() {
             setSelectedMusic(filename);
             setUploadedMusic(null);
             setUploadedMusicFile(null);
+
+            // Get duration for preset
+            const preset = musicPresets.find(p => p.filename === filename);
+            if (preset) {
+                getAudioDuration(preset.url).then(setAudioDuration);
+            }
         }
     };
 
@@ -163,6 +192,17 @@ export default function SlideshowPage() {
                 }
             }
 
+            let finalAudioDuration = audioDuration;
+            if (audioLoop && !finalAudioDuration && (audioUrl || selectedMusic)) {
+                // Try to get duration if missing
+                const urlToCheck = uploadedMusic || (selectedMusic ? musicPresets.find(p => p.filename === selectedMusic)?.url : null);
+                if (urlToCheck) {
+                    console.log("[SlideshowPage] Audio duration missing, fetching for:", urlToCheck);
+                    finalAudioDuration = await getAudioDuration(urlToCheck);
+                    setAudioDuration(finalAudioDuration);
+                }
+            }
+
             const payload = {
                 compositionId: "slideshow",
                 images: imageUrls,
@@ -170,8 +210,11 @@ export default function SlideshowPage() {
                 animation: { frameRate: 30 },
                 audioPreset: selectedMusic,
                 audio: audioUrl,
+                audioLoop,
+                audioDuration: finalAudioDuration,
                 renderMode,
             };
+            console.log("[SlideshowPage] Generating with payload:", payload);
 
             setRenderStatus("Starting render...");
             const response = await fetch("/api/render", {
@@ -391,6 +434,18 @@ export default function SlideshowPage() {
                                         )}
                                     </div>
                                 </div>
+
+                                <label className="flex items-center gap-2 mt-4">
+                                    <input
+                                        type="checkbox"
+                                        checked={audioLoop}
+                                        onChange={(e) => setAudioLoop(e.target.checked)}
+                                        className="h-3 w-3 rounded border-slate-300 text-sky-500 focus:ring-sky-500 dark:border-slate-700 dark:bg-slate-950/60"
+                                    />
+                                    <span className="text-[11px] font-semibold uppercase tracking-[0.25em] text-slate-600 dark:text-slate-400">
+                                        Loop audio {audioDuration ? `(${audioDuration.toFixed(1)}s)` : "(?)"}
+                                    </span>
+                                </label>
                             </div>
                         </div>
                     </section>

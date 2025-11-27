@@ -75,6 +75,7 @@ export interface AppStore extends AppState {
   setAnimationDuration: (durationMs: number) => void;
   setTheme: (theme: Theme) => void;
   toggleTheme: () => void;
+  setAudioLoop: (loop: boolean) => void;
 }
 
 const generateId = () => {
@@ -113,6 +114,7 @@ export const useAppStore = create<AppStore>()(
       animation: defaultAnimation,
       video: defaultVideo,
       audio: undefined,
+      audioLoop: true,
       theme: "dark",
       setPhotoAt: (index, slot, image) =>
         set((state) => {
@@ -205,6 +207,7 @@ export const useAppStore = create<AppStore>()(
         set(() => ({ theme })),
       toggleTheme: () =>
         set((state) => ({ theme: state.theme === "dark" ? "light" : "dark" })),
+      setAudioLoop: (loop) => set(() => ({ audioLoop: loop })),
     }),
     {
       name: "video-editor-store",

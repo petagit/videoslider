@@ -67,6 +67,12 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
   try {
     const body = await request.json();
     const { compositionId = "slider-reveal", renderMode, ...payload } = body;
+    console.log("[API] Render Request:", {
+      compositionId,
+      renderMode,
+      audioLoop: payload.audioLoop,
+      audioDuration: payload.audioDuration
+    });
 
     // Determine render mode: 'lambda', 'local', or auto-detect
     const useLambda = renderMode === 'lambda'
@@ -166,7 +172,12 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
       ));
     }
 
-    const finalPayload = { ...payload, audio: audioDataUrl };
+    const finalPayload = {
+      ...payload,
+      audio: audioDataUrl,
+      audioLoop: payload.audioLoop,
+      audioDuration: payload.audioDuration
+    };
 
     // --- EXECUTE RENDER ---
 

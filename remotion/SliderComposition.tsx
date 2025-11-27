@@ -1,4 +1,4 @@
-import { AbsoluteFill, Audio, Easing, Img, interpolate, useCurrentFrame, useVideoConfig } from "remotion";
+import { AbsoluteFill, Audio, Easing, Img, interpolate, Sequence, useCurrentFrame, useVideoConfig } from "remotion";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 
@@ -6,6 +6,8 @@ export interface SliderCompositionProps extends Record<string, unknown> {
   topImages: string[];
   bottomImages: string[];
   audio?: string | null;
+  audioLoop?: boolean;
+  audioDuration?: number;
   compare: {
     orientation: "vertical" | "horizontal";
     showDivider: boolean;
@@ -91,6 +93,8 @@ export const SliderComposition: React.FC<SliderCompositionProps> = ({
   compare,
   overlay,
   animation,
+  audioLoop,
+  audioDuration,
 }) => {
   const frame = useCurrentFrame();
   const { durationInFrames, width, height } = useVideoConfig();
@@ -107,10 +111,10 @@ export const SliderComposition: React.FC<SliderCompositionProps> = ({
   const easedProgress = framesPerSegment <= 1
     ? 1
     : interpolate(frameWithinSegment, [0, framesPerSegment - 1], [0, 1], {
-        easing: easingMap[animation.easing],
-        extrapolateLeft: "clamp",
-        extrapolateRight: "clamp",
-      });
+      easing: easingMap[animation.easing],
+      extrapolateLeft: "clamp",
+      extrapolateRight: "clamp",
+    });
 
   const progress = directionMap(animation.direction, easedProgress);
   const percentage = progress * 100;
@@ -165,13 +169,31 @@ export const SliderComposition: React.FC<SliderCompositionProps> = ({
   return (
     <AbsoluteFill style={{ backgroundColor: "#020617" }}>
       {audio ? (
-        <Audio
-          src={audio}
-          trimBefore={0}
-          trimAfter={durationInFrames}
-          volume={1}
-          useWebAudioApi
-        />
+        audioLoop && audioDuration ? (
+          // Loop audio
+          Array.from({ length: Math.ceil(durationInFrames / (audioDuration * 30)) }).map((_, i) => (
+            <Sequence
+              key={`audio-loop-${i}`}
+              from={Math.round(i * audioDuration * 30)}
+              durationInFrames={Math.round(audioDuration * 30)}
+            >
+              <Audio
+                src={audio}
+                volume={1}
+              // No trim needed if we loop the whole file
+              />
+            </Sequence>
+          ))
+        ) : (
+          // Single play
+          <Audio
+            src={audio}
+            trimBefore={0}
+            trimAfter={durationInFrames}
+            volume={1}
+            useWebAudioApi
+          />
+        )
       ) : null}
       <AbsoluteFill style={{ transform: "scale(1.02)" }}>
         {currentBottomImage ? (

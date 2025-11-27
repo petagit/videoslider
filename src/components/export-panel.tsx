@@ -29,7 +29,9 @@ export function ExportPanel() {
   const compare = useAppStore((state) => state.compare);
   const animation = useAppStore((state) => state.animation);
   const audio = useAppStore((state) => state.audio);
+  const audioLoop = useAppStore((state) => state.audioLoop);
   const setAudio = useAppStore((state) => state.setAudio);
+  const setAudioLoop = useAppStore((state) => state.setAudioLoop);
   const setAnimationDuration = useAppStore((state) => state.setAnimationDuration);
   const [isExporting, setIsExporting] = useState(false);
   const [status, setStatus] = useState<string | null>(null);
@@ -89,6 +91,18 @@ export function ExportPanel() {
         name: preset.name,
         origin: "preset",
       });
+
+      // Get duration
+      const audioObj = new Audio(preset.url);
+      audioObj.onloadedmetadata = () => {
+        setAudio({
+          id: `preset-${preset.id}`,
+          src: preset.url,
+          name: preset.name,
+          origin: "preset",
+          duration: audioObj.duration,
+        });
+      };
     },
     [setAudio],
   );
@@ -212,6 +226,8 @@ export function ExportPanel() {
         animation,
         audio: audio?.origin === "preset" ? undefined : audioUrl, // If URL, pass as audio. If preset, pass as audioPreset below
         audioPreset: audio?.origin === "preset" ? audio.name : undefined, // API expects filename for preset? API logic needs check.
+        audioLoop,
+        audioDuration: audio?.duration,
         // Actually API logic: if audioPreset is passed, it looks in public/music-presets.
         // Our audio.name for preset is the filename? Let's check handleSelectPreset.
         // handleSelectPreset sets name: preset.name. But preset.filename is what we need?
@@ -276,7 +292,9 @@ export function ExportPanel() {
     compare.showDivider,
     overlay,
     photoPairs,
+    photoPairs,
     audio,
+    audioLoop,
   ]);
 
   const handleExport = useCallback(async () => {
@@ -341,6 +359,11 @@ export function ExportPanel() {
                 name: file.name,
                 origin: "upload",
               };
+
+              const audioObj = new Audio(src);
+              audioObj.onloadedmetadata = () => {
+                setAudio({ ...audioPayload, duration: audioObj.duration });
+              };
               setAudio(audioPayload);
             }}
             className="rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-700 focus:border-sky-400 focus:outline-none dark:border-slate-700 dark:bg-slate-950/60 dark:text-slate-100"
@@ -367,8 +390,8 @@ export function ExportPanel() {
                       type="button"
                       onClick={() => handleSelectPreset(preset)}
                       className={`rounded-lg border border-dashed px-2 py-1.5 text-center text-[11px] font-semibold uppercase tracking-[0.25em] transition-colors ${isSelected
-                          ? "border-sky-400 bg-sky-500/20 text-sky-700 dark:text-sky-100"
-                          : "border-slate-300 bg-white text-slate-600 hover:border-slate-400 hover:text-slate-800 dark:border-slate-700 dark:bg-slate-950/70 dark:text-slate-300 dark:hover:border-slate-500 dark:hover:text-slate-100"
+                        ? "border-sky-400 bg-sky-500/20 text-sky-700 dark:text-sky-100"
+                        : "border-slate-300 bg-white text-slate-600 hover:border-slate-400 hover:text-slate-800 dark:border-slate-700 dark:bg-slate-950/70 dark:text-slate-300 dark:hover:border-slate-500 dark:hover:text-slate-100"
                         }`}
                     >
                       <span className="line-clamp-2">{preset.name}</span>
@@ -402,6 +425,18 @@ export function ExportPanel() {
           ) : (
             <p className="text-[11px] text-slate-500 dark:text-slate-400">No music selected.</p>
           )}
+
+          <label className="flex items-center gap-2">
+            <input
+              type="checkbox"
+              checked={audioLoop}
+              onChange={(e) => setAudioLoop(e.target.checked)}
+              className="h-3 w-3 rounded border-slate-300 text-sky-500 focus:ring-sky-500 dark:border-slate-700 dark:bg-slate-950/60"
+            />
+            <span className="text-[11px] font-semibold uppercase tracking-[0.25em] text-slate-600 dark:text-slate-400">
+              Loop audio
+            </span>
+          </label>
         </div>
 
         <label className="flex flex-col gap-2">
@@ -475,6 +510,6 @@ export function ExportPanel() {
           </p>
         ) : null}
       </div>
-    </section>
+    </section >
   );
 }

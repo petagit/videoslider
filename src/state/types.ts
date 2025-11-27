@@ -19,6 +19,7 @@ export interface UploadedAudio {
   src: string;
   name: string;
   origin: "upload" | "preset";
+  duration?: number;
 }
 
 export interface OverlayTextStyle {
@@ -78,6 +79,7 @@ export interface AppState {
   photoPairs: PhotoPair[];
   activePairIndex: number;
   audio?: UploadedAudio;
+  audioLoop: boolean;
   overlay: OverlayTextStyle;
   compare: CompareSettings;
   exportOptions: ExportOptions;
