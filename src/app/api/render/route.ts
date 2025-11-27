@@ -155,9 +155,15 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
 
     // Process Images
     if (payload.images && Array.isArray(payload.images)) {
-      payload.images = await Promise.all(payload.images.map((img: string, i: number) =>
-        resolveAsset(img, tmpDir, `slide-${i}`, useLambda)
-      ));
+      payload.images = await Promise.all(payload.images.map(async (item: string | { src: string;[key: string]: any }, i: number) => {
+        if (typeof item === 'string') {
+          return resolveAsset(item, tmpDir, `slide-${i}`, useLambda);
+        } else if (typeof item === 'object' && item.src) {
+          const resolvedSrc = await resolveAsset(item.src, tmpDir, `slide-${i}`, useLambda);
+          return { ...item, src: resolvedSrc };
+        }
+        return item;
+      }));
     }
 
     if (payload.topImages && Array.isArray(payload.topImages)) {

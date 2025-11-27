@@ -12,6 +12,12 @@ interface MusicPreset {
     url: string;
 }
 
+interface SlideImage {
+    src: string; // Blob URL for preview
+    color: string;
+    file: File; // Original file for upload
+}
+
 const getAudioDuration = (url: string): Promise<number> => {
     return new Promise((resolve) => {
         const audio = new Audio(url);
@@ -26,9 +32,33 @@ const getAudioDuration = (url: string): Promise<number> => {
     });
 };
 
+const extractColor = async (imageUrl: string): Promise<string> => {
+    try {
+        const img = new Image();
+        // Blob URLs don't need crossOrigin, but if it's remote it might.
+        // Local files are blob: here.
+        // img.crossOrigin = "Anonymous"; 
+        img.src = imageUrl;
+        await new Promise((resolve, reject) => {
+            img.onload = resolve;
+            img.onerror = reject;
+        });
+        const canvas = document.createElement("canvas");
+        canvas.width = 1;
+        canvas.height = 1;
+        const ctx = canvas.getContext("2d");
+        if (!ctx) return "black";
+        ctx.drawImage(img, 0, 0, 1, 1);
+        const [r, g, b] = ctx.getImageData(0, 0, 1, 1).data;
+        return `rgb(${r}, ${g}, ${b})`;
+    } catch (e) {
+        console.warn("Failed to extract color", e);
+        return "black";
+    }
+};
+
 export default function SlideshowPage() {
-    const [images, setImages] = useState<string[]>([]);
-    const [imageFiles, setImageFiles] = useState<File[]>([]);
+    const [images, setImages] = useState<SlideImage[]>([]);
     const [durationPerSlide, setDurationPerSlide] = useState(1.5);
     const [isGenerating, setIsGenerating] = useState(false);
     const [videoUrl, setVideoUrl] = useState<string | null>(null);
@@ -53,10 +83,13 @@ export default function SlideshowPage() {
             .catch((err) => console.error("Failed to load music presets", err));
     }, []);
 
-    const handleFiles = useCallback((files: File[]) => {
-        const newImages = files.map((file) => URL.createObjectURL(file));
+    const handleFiles = useCallback(async (files: File[]) => {
+        const newImages = await Promise.all(files.map(async (file) => {
+            const src = URL.createObjectURL(file);
+            const color = await extractColor(src);
+            return { src, color, file };
+        }));
         setImages((prev) => [...prev, ...newImages]);
-        setImageFiles((prev) => [...prev, ...files]);
     }, []);
 
     const handleImageUpload = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
@@ -87,17 +120,12 @@ export default function SlideshowPage() {
 
     const clearImages = useCallback(() => {
         setImages([]);
-        setImageFiles([]);
     }, []);
 
     const handleMusicUpload = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
         if (e.target.files && e.target.files[0]) {
             const file = e.target.files[0];
             setUploadedMusic(URL.createObjectURL(file));
-            setUploadedMusicFile(file);
-            setUploadedMusicFile(file);
-            setSelectedMusic(null); // Deselect preset if custom music is uploaded
-
             setUploadedMusicFile(file);
             setSelectedMusic(null); // Deselect preset if custom music is uploaded
 
@@ -172,21 +200,33 @@ export default function SlideshowPage() {
         }, 1000);
 
         try {
-            let imageUrls: string[] = [];
+            let imagePayload: { src: string; color: string }[] = [];
             let audioUrl: string | null = null;
 
             if (renderMode === 'lambda') {
                 setRenderStatus("Uploading assets...");
-                // Upload images to S3
-                imageUrls = await Promise.all(imageFiles.map(uploadFileToS3));
+                // Upload images to S3 concurrently but maybe limit concurrency if needed?
+                // For now, let's use a batched approach if possible, but Promise.all is existing pattern.
+                // We'll stick to Promise.all but we map over `images` state now.
+                
+                const uploadedUrls = await Promise.all(images.map(async (img) => {
+                     const url = await uploadFileToS3(img.file);
+                     return { src: url, color: img.color };
+                }));
+                imagePayload = uploadedUrls;
 
                 // Upload audio if custom file
                 if (uploadedMusicFile) {
                     audioUrl = await uploadFileToS3(uploadedMusicFile);
                 }
             } else {
-                // Local mode: use base64 as before
-                imageUrls = await Promise.all(imageFiles.map(fileToBase64));
+                // Local mode: use base64
+                const base64s = await Promise.all(images.map(async (img) => {
+                    const b64 = await fileToBase64(img.file);
+                    return { src: b64, color: img.color };
+                }));
+                imagePayload = base64s;
+
                 if (uploadedMusicFile) {
                     audioUrl = await fileToBase64(uploadedMusicFile);
                 }
@@ -205,7 +245,7 @@ export default function SlideshowPage() {
 
             const payload = {
                 compositionId: "slideshow",
-                images: imageUrls,
+                images: imagePayload,
                 durationPerSlide,
                 animation: { frameRate: 30 },
                 audioPreset: selectedMusic,
@@ -300,6 +340,9 @@ export default function SlideshowPage() {
     // Determine audio source for preview
     const previewAudio = uploadedMusic || (selectedMusic ? musicPresets.find(p => p.filename === selectedMusic)?.url : undefined);
 
+    // Filter images for player preview (just src and color)
+    const playerImages = images.map(img => ({ src: img.src, color: img.color }));
+
     return (
         <div className="flex h-full overflow-hidden text-slate-900 dark:text-slate-100">
             <div className="flex flex-1 overflow-hidden">
@@ -349,10 +392,16 @@ export default function SlideshowPage() {
                                 {images.map((img, i) => (
                                     <div key={i} className="relative aspect-square rounded-lg overflow-hidden border border-slate-200 dark:border-slate-800">
                                         {/* eslint-disable-next-line @next/next/no-img-element */}
-                                        <img src={img} alt={`Slide ${i}`} className="w-full h-full object-cover" />
+                                        <img src={img.src} alt={`Slide ${i}`} className="w-full h-full object-cover" />
                                         <div className="absolute bottom-0 right-0 bg-black/50 px-1 py-0.5 text-[9px] text-white backdrop-blur-sm">
                                             {i + 1}
                                         </div>
+                                        {/* Color indicator */}
+                                        <div 
+                                            className="absolute top-1 right-1 w-3 h-3 rounded-full border border-white/50 shadow-sm" 
+                                            style={{ backgroundColor: img.color }}
+                                            title={`Dominant Color: ${img.color}`}
+                                        />
                                     </div>
                                 ))}
                             </div>
@@ -542,7 +591,7 @@ export default function SlideshowPage() {
                         <Player
                             component={SlideshowComposition}
                             inputProps={{
-                                images,
+                                images: playerImages,
                                 durationPerSlide,
                                 audio: previewAudio,
                             }}
