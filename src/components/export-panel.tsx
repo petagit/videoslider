@@ -119,7 +119,10 @@ export function ExportPanel() {
       body: JSON.stringify({ filename: file.name, contentType }),
     });
 
-    if (!res.ok) throw new Error("Failed to get upload URL");
+    if (!res.ok) {
+      const errorData = await res.json().catch(() => ({}));
+      throw new Error(errorData.error || "Failed to get upload URL");
+    }
     const { uploadUrl, fileUrl } = await res.json();
 
     // 2. Upload to S3 with XHR for progress
