@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useCallback, useEffect, useRef } from "react";
+import React, { useState, useCallback, useEffect, useRef, DragEvent as ReactDragEvent } from "react";
 import { Player } from "@remotion/player";
 import { SlideshowComposition } from "../../../remotion/SlideshowComposition";
 import { toast } from "sonner";
@@ -75,6 +75,8 @@ export default function SlideshowPage() {
     const [renderStatus, setRenderStatus] = useState<string | null>(null);
     const [elapsedTime, setElapsedTime] = useState(0);
     const timerRef = useRef<NodeJS.Timeout | null>(null);
+    const [draggedIndex, setDraggedIndex] = useState<number | null>(null);
+    const [dragOverIndex, setDragOverIndex] = useState<number | null>(null);
 
     useEffect(() => {
         fetch("/api/music-presets")
@@ -120,6 +122,62 @@ export default function SlideshowPage() {
 
     const clearImages = useCallback(() => {
         setImages([]);
+    }, []);
+
+    const removeImage = useCallback((index: number) => {
+        setImages((prev) => {
+            // Revoke the blob URL to free memory
+            URL.revokeObjectURL(prev[index].src);
+            return prev.filter((_, i) => i !== index);
+        });
+    }, []);
+
+    // Drag handlers for rearranging images
+    const handleImageDragStart = useCallback((e: ReactDragEvent<HTMLDivElement>, index: number) => {
+        setDraggedIndex(index);
+        e.dataTransfer.effectAllowed = "move";
+        // Set transparent drag image
+        const dragImage = document.createElement("div");
+        dragImage.style.opacity = "0";
+        document.body.appendChild(dragImage);
+        e.dataTransfer.setDragImage(dragImage, 0, 0);
+        setTimeout(() => document.body.removeChild(dragImage), 0);
+    }, []);
+
+    const handleImageDragOver = useCallback((e: ReactDragEvent<HTMLDivElement>, index: number) => {
+        e.preventDefault();
+        e.dataTransfer.dropEffect = "move";
+        if (draggedIndex !== null && draggedIndex !== index) {
+            setDragOverIndex(index);
+        }
+    }, [draggedIndex]);
+
+    const handleImageDragLeave = useCallback(() => {
+        setDragOverIndex(null);
+    }, []);
+
+    const handleImageDrop = useCallback((e: ReactDragEvent<HTMLDivElement>, dropIndex: number) => {
+        e.preventDefault();
+        if (draggedIndex === null || draggedIndex === dropIndex) {
+            setDraggedIndex(null);
+            setDragOverIndex(null);
+            return;
+        }
+
+        setImages((prev) => {
+            const newImages = [...prev];
+            const [draggedItem] = newImages.splice(draggedIndex, 1);
+            newImages.splice(dropIndex, 0, draggedItem);
+            return newImages;
+        });
+
+        setDraggedIndex(null);
+        setDragOverIndex(null);
+    }, [draggedIndex]);
+
+    const handleImageDragEnd = useCallback(() => {
+        setDraggedIndex(null);
+        setDragOverIndex(null);
     }, []);
 
     const handleMusicUpload = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
@@ -393,15 +451,49 @@ export default function SlideshowPage() {
                         {images.length > 0 && (
                             <div className="mt-4 grid grid-cols-4 gap-2">
                                 {images.map((img, i) => (
-                                    <div key={i} className="relative aspect-square rounded-lg overflow-hidden border border-slate-200 dark:border-slate-800">
+                                    <div
+                                        key={i}
+                                        draggable
+                                        onDragStart={(e) => handleImageDragStart(e, i)}
+                                        onDragOver={(e) => handleImageDragOver(e, i)}
+                                        onDragLeave={handleImageDragLeave}
+                                        onDrop={(e) => handleImageDrop(e, i)}
+                                        onDragEnd={handleImageDragEnd}
+                                        className={`group relative aspect-square rounded-lg overflow-hidden border-2 cursor-grab active:cursor-grabbing transition-all duration-150 ${
+                                            draggedIndex === i
+                                                ? "opacity-50 scale-95 border-sky-400"
+                                                : dragOverIndex === i
+                                                ? "border-sky-400 ring-2 ring-sky-400/50 scale-105"
+                                                : "border-slate-200 dark:border-slate-800 hover:border-slate-300 dark:hover:border-slate-700"
+                                        }`}
+                                    >
                                         {/* eslint-disable-next-line @next/next/no-img-element */}
-                                        <img src={img.src} alt={`Slide ${i}`} className="w-full h-full object-cover" />
-                                        <div className="absolute bottom-0 right-0 bg-black/50 px-1 py-0.5 text-[9px] text-white backdrop-blur-sm">
+                                        <img
+                                            src={img.src}
+                                            alt={`Slide ${i}`}
+                                            className="w-full h-full object-cover pointer-events-none"
+                                        />
+                                        {/* Remove button */}
+                                        <button
+                                            type="button"
+                                            onClick={(e) => {
+                                                e.stopPropagation();
+                                                removeImage(i);
+                                            }}
+                                            className="absolute top-1 left-1 w-5 h-5 flex items-center justify-center rounded-full bg-black/60 text-white opacity-0 group-hover:opacity-100 transition-opacity hover:bg-red-500 focus:opacity-100 focus:bg-red-500"
+                                            title="Remove image"
+                                        >
+                                            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" className="w-3 h-3">
+                                                <path d="M6.28 5.22a.75.75 0 00-1.06 1.06L8.94 10l-3.72 3.72a.75.75 0 101.06 1.06L10 11.06l3.72 3.72a.75.75 0 101.06-1.06L11.06 10l3.72-3.72a.75.75 0 00-1.06-1.06L10 8.94 6.28 5.22z" />
+                                            </svg>
+                                        </button>
+                                        {/* Position number */}
+                                        <div className="absolute bottom-0 right-0 bg-black/50 px-1.5 py-0.5 text-[9px] text-white backdrop-blur-sm rounded-tl">
                                             {i + 1}
                                         </div>
                                         {/* Color indicator */}
-                                        <div 
-                                            className="absolute top-1 right-1 w-3 h-3 rounded-full border border-white/50 shadow-sm" 
+                                        <div
+                                            className="absolute top-1 right-1 w-3 h-3 rounded-full border border-white/50 shadow-sm"
                                             style={{ backgroundColor: img.color }}
                                             title={`Dominant Color: ${img.color}`}
                                         />
@@ -411,6 +503,7 @@ export default function SlideshowPage() {
                         )}
                         <p className="mt-3 text-[11px] text-slate-500 dark:text-slate-400 text-center">
                             {images.length} image{images.length !== 1 ? 's' : ''} selected
+                            {images.length > 1 && <span className="block text-[10px] mt-0.5 opacity-70">Drag to reorder • Hover and click ✕ to remove</span>}
                         </p>
                     </section>
 

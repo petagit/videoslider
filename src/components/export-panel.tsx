@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useState, useRef } from "react";
+import { useCallback, useEffect, useState } from "react";
 
 import { useAppStore } from "../state/store";
 import type { UploadedAudio } from "../state/types";
@@ -294,7 +294,6 @@ export function ExportPanel() {
     compare.orientation,
     compare.showDivider,
     overlay,
-    photoPairs,
     photoPairs,
     audio,
     audioLoop,

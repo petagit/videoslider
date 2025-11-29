@@ -3,7 +3,7 @@ import path from "node:path";
 import os from "node:os";
 import fs, { readdir } from "node:fs/promises";
 import { spawn } from "node:child_process";
-import { renderMediaOnLambda, getRenderProgress } from "@remotion/lambda/client";
+import { renderMediaOnLambda } from "@remotion/lambda/client";
 import { uploadBase64ToS3 } from "@/lib/s3-upload";
 import { AwsRegion } from "@remotion/lambda";
 
@@ -155,7 +155,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
 
     // Process Images
     if (payload.images && Array.isArray(payload.images)) {
-      payload.images = await Promise.all(payload.images.map(async (item: string | { src: string;[key: string]: any }, i: number) => {
+      payload.images = await Promise.all(payload.images.map(async (item: string | { src: string; color?: string }, i: number) => {
         if (typeof item === 'string') {
           return resolveAsset(item, tmpDir, `slide-${i}`, useLambda);
         } else if (typeof item === 'object' && item.src) {

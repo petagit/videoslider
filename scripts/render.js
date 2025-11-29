@@ -73,7 +73,17 @@ async function main() {
   
   // Rewrite paths in payload
   if (payload.audio) payload.audio = convertUrl(payload.audio);
-  if (payload.images) payload.images = payload.images.map(convertUrl);
+  if (payload.images) {
+    payload.images = payload.images.map(img => {
+      if (typeof img === 'string') {
+        return convertUrl(img);
+      } else if (typeof img === 'object' && img !== null && img.src) {
+        // Handle { src: string, color?: string } objects
+        return { ...img, src: convertUrl(img.src) };
+      }
+      return img;
+    });
+  }
   if (payload.topImages) payload.topImages = payload.topImages.map(convertUrl);
   if (payload.bottomImages) payload.bottomImages = payload.bottomImages.map(convertUrl);
   
@@ -101,6 +111,15 @@ async function main() {
     if (!Array.isArray(images) || images.length === 0) {
       server.close();
       throw new Error('No images provided for slideshow');
+    }
+    // Validate images have proper src
+    const hasValidImages = images.every(img => 
+      (typeof img === 'string' && img.length > 0) || 
+      (typeof img === 'object' && img !== null && img.src)
+    );
+    if (!hasValidImages) {
+      server.close();
+      throw new Error('Invalid image format in slideshow payload');
     }
   }
 
