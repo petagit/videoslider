@@ -4,6 +4,7 @@ import React, { useState, useCallback, useEffect, useRef, DragEvent as ReactDrag
 import { Player } from "@remotion/player";
 import { SlideshowComposition } from "../../../remotion/SlideshowComposition";
 import { toast } from "sonner";
+import { resizeImage } from "@/lib/image-processing";
 
 interface MusicPreset {
     id: string;
@@ -77,6 +78,38 @@ export default function SlideshowPage() {
     const timerRef = useRef<NodeJS.Timeout | null>(null);
     const [draggedIndex, setDraggedIndex] = useState<number | null>(null);
     const [dragOverIndex, setDragOverIndex] = useState<number | null>(null);
+    
+    const [previewingAudio, setPreviewingAudio] = useState<string | null>(null);
+    const audioPreviewRef = useRef<HTMLAudioElement | null>(null);
+
+    useEffect(() => {
+        return () => {
+            if (audioPreviewRef.current) {
+                audioPreviewRef.current.pause();
+            }
+        };
+    }, []);
+
+    const togglePreview = (url: string, id: string) => {
+        if (previewingAudio === id) {
+            // Stop
+            if (audioPreviewRef.current) {
+                audioPreviewRef.current.pause();
+                audioPreviewRef.current = null;
+            }
+            setPreviewingAudio(null);
+        } else {
+            // Start new
+            if (audioPreviewRef.current) {
+                audioPreviewRef.current.pause();
+            }
+            const audio = new Audio(url);
+            audio.onended = () => setPreviewingAudio(null);
+            audio.play().catch(e => console.error("Playback failed", e));
+            audioPreviewRef.current = audio;
+            setPreviewingAudio(id);
+        }
+    };
 
     useEffect(() => {
         fetch("/api/music-presets")
@@ -87,11 +120,20 @@ export default function SlideshowPage() {
 
     const handleFiles = useCallback(async (files: File[]) => {
         const newImages = await Promise.all(files.map(async (file) => {
-            const src = URL.createObjectURL(file);
-            const color = await extractColor(src);
-            return { src, color, file };
+            try {
+                // Resize if > 1920x1920 to prevent stack overflow/memory issues
+                const resizedFile = await resizeImage(file, 1920, 1920);
+                const src = URL.createObjectURL(resizedFile);
+                const color = await extractColor(src);
+                return { src, color, file: resizedFile };
+            } catch (error) {
+                console.error("Failed to process image:", file.name, error);
+                toast.error(`Failed to process ${file.name}`);
+                return null;
+            }
         }));
-        setImages((prev) => [...prev, ...newImages]);
+        
+        setImages((prev) => [...prev, ...newImages.filter((img): img is SlideImage => img !== null)]);
     }, []);
 
     const handleImageUpload = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
@@ -217,6 +259,15 @@ export default function SlideshowPage() {
         });
     };
 
+    const triggerDownload = (url: string) => {
+        const link = document.createElement('a');
+        link.href = url;
+        link.download = url.split('/').pop() || 'video.mp4';
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+    };
+
     const uploadFileToS3 = async (file: File): Promise<string> => {
         // Get presigned URL
         const res = await fetch("/api/upload-url", {
@@ -315,7 +366,17 @@ export default function SlideshowPage() {
                 audioDuration: finalAudioDuration,
                 renderMode,
             };
-            console.log("[SlideshowPage] Generating with payload:", payload);
+            
+            // Log payload without massive base64 strings
+            console.log("[SlideshowPage] Generating with payload:", {
+                ...payload,
+                images: payload.images.map(img => 
+                    typeof img === 'object' && img.src && img.src.length > 100 
+                        ? { ...img, src: `[Base64 string length: ${img.src.length}]` } 
+                        : img
+                ),
+                audio: payload.audio && payload.audio.length > 100 ? `[Base64/URL length: ${payload.audio.length}]` : payload.audio
+            });
 
             setRenderStatus("Starting render...");
             const response = await fetch("/api/render", {
@@ -356,6 +417,7 @@ export default function SlideshowPage() {
                         setProgress(1);
                         setRenderStatus("Done!");
                         toast.success("Render completed successfully!");
+                        triggerDownload(status.outputFile);
                         break;
                     }
 
@@ -364,8 +426,17 @@ export default function SlideshowPage() {
                 }
             } else {
                 // Local render returns URL directly
-                setVideoUrl(data.url);
+                // Convert to API download URL to avoid 404s and ensure download
+                const filename = data.url.split('/').pop();
+                const apiDownloadUrl = `/api/download-local?file=${filename}`;
+                
+                // If we prefer direct link if available:
+                // setVideoUrl(data.url); 
+                // But user reported 404 issues, so API route is safer.
+                setVideoUrl(apiDownloadUrl);
+                setRenderStatus("Done!");
                 toast.success("Render completed successfully!");
+                triggerDownload(apiDownloadUrl);
             }
 
         } catch (error) {
@@ -563,16 +634,34 @@ export default function SlideshowPage() {
                                     </span>
                                     <div className="grid grid-cols-1 gap-2 max-h-40 overflow-y-auto pr-1">
                                         {musicPresets.map((preset) => (
-                                            <button
-                                                key={preset.id}
-                                                onClick={() => handlePresetSelect(preset.filename)}
-                                                className={`w-full truncate rounded-lg border px-3 py-2 text-left text-xs transition-colors ${selectedMusic === preset.filename
-                                                    ? "border-sky-400 bg-sky-500/20 text-sky-700 dark:text-sky-100"
-                                                    : "border-slate-200 bg-white text-slate-600 hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-950/40 dark:text-slate-300 dark:hover:bg-slate-900"
-                                                    }`}
-                                            >
-                                                {preset.name}
-                                            </button>
+                                            <div key={preset.id} className="flex items-center gap-2">
+                                                <button
+                                                    type="button"
+                                                    onClick={() => togglePreview(preset.url, preset.id)}
+                                                    className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full border border-slate-200 bg-white text-slate-600 hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-300 dark:hover:bg-slate-800"
+                                                    title={previewingAudio === preset.id ? "Pause" : "Preview"}
+                                                >
+                                                    {previewingAudio === preset.id ? (
+                                                        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" className="h-3 w-3">
+                                                            <path fillRule="evenodd" d="M6.75 5.25a.75.75 0 01.75-.75H9a.75.75 0 01.75.75v13.5a.75.75 0 01-.75.75H7.5a.75.75 0 01-.75-.75V5.25zm7.5 0A.75.75 0 0115 4.5h1.5a.75.75 0 01.75.75v13.5a.75.75 0 01-.75.75H15a.75.75 0 01-.75-.75V5.25z" clipRule="evenodd" />
+                                                        </svg>
+                                                    ) : (
+                                                        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" className="h-3 w-3 ml-0.5">
+                                                            <path fillRule="evenodd" d="M4.5 5.653c0-1.426 1.529-2.33 2.779-1.643l11.54 6.348c1.295.712 1.295 2.573 0 3.285L7.28 19.991c-1.25.687-2.779-.217-2.779-1.643V5.653z" clipRule="evenodd" />
+                                                        </svg>
+                                                    )}
+                                                </button>
+                                                <button
+                                                    key={preset.id}
+                                                    onClick={() => handlePresetSelect(preset.filename)}
+                                                    className={`flex-1 truncate rounded-lg border px-3 py-2 text-left text-xs transition-colors ${selectedMusic === preset.filename
+                                                        ? "border-sky-400 bg-sky-500/20 text-sky-700 dark:text-sky-100"
+                                                        : "border-slate-200 bg-white text-slate-600 hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-950/40 dark:text-slate-300 dark:hover:bg-slate-900"
+                                                        }`}
+                                                >
+                                                    {preset.name}
+                                                </button>
+                                            </div>
                                         ))}
                                         {musicPresets.length === 0 && (
                                             <p className="text-center text-[10px] italic text-slate-400">No presets found.</p>
