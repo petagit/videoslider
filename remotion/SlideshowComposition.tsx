@@ -55,7 +55,7 @@ export const SlideshowComposition: React.FC<SlideshowCompositionProps> = ({
 
     return (
         <AbsoluteFill style={{ backgroundColor: "black" }}>
-            {audio && (
+            {audio && typeof audio === "string" && (
                 audioLoop && audioDuration ? (
                     // Loop audio
                     Array.from({ length: Math.ceil(totalDurationInFrames / (audioDuration * fps)) }).map((_, i) => (
@@ -76,7 +76,7 @@ export const SlideshowComposition: React.FC<SlideshowCompositionProps> = ({
                 return (
                     <React.Fragment key={index}>
                         <Sequence from={from} durationInFrames={slideDurationInFrames}>
-                            <Audio src={shutterSound} />
+                            {typeof shutterSound === "string" && <Audio src={shutterSound} />}
                         </Sequence>
 
                         <Sequence
