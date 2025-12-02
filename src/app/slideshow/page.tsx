@@ -841,7 +841,7 @@ export default function SlideshowPage() {
                             <div
                                 className={cn(
                                     "w-full max-w-5xl overflow-hidden rounded-lg border bg-background shadow-sm transition-all duration-300",
-                                    aspectRatio === "9:16" ? "aspect-[9/16] max-h-[80vh] w-auto" : "aspect-video"
+                                    aspectRatio === "9:16" ? "aspect-[9/16] h-[80vh] w-auto" : "aspect-video"
                                 )}
                             >
                                 <Player
