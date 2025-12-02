@@ -56,12 +56,18 @@ export const RemotionRoot: React.FC = () => (
         const fps = 30;
         const durationPerSlide = props.durationPerSlide ?? 1.5;
         const count = props.images?.length ?? 0;
-        
+
         const durationInFrames = Math.round(count * durationPerSlide * fps);
+
+        const isLandscape = props.aspectRatio === "16:9";
+        const width = isLandscape ? 1920 : 1080;
+        const height = isLandscape ? 1080 : 1920;
 
         return {
           durationInFrames: count === 0 ? 30 : durationInFrames,
           fps,
+          width,
+          height,
         };
       }}
     />

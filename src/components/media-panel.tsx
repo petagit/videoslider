@@ -210,9 +210,9 @@ export function MediaPanel() {
   return (
     <Card>
       <CardHeader className="pb-3">
-        <div className="flex items-center justify-between">
-          <CardTitle className="text-sm font-medium uppercase tracking-wider text-muted-foreground">Media</CardTitle>
-          <div className="flex items-center gap-2">
+        <div className="flex min-w-0 items-center justify-between gap-2">
+          <CardTitle className="truncate text-sm font-medium uppercase tracking-wider text-muted-foreground">Media</CardTitle>
+          <div className="flex shrink-0 items-center gap-2">
             <Dialog open={isModalOpen} onOpenChange={setIsModalOpen}>
               <DialogTrigger asChild>
                 <Button
@@ -433,7 +433,7 @@ export function MediaPanel() {
           )}
         </div>
 
-        <div className="grid grid-cols-2 gap-3">
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
           <div className="flex flex-col gap-2 rounded-lg border bg-card p-3">
             <div className="flex items-center justify-between">
               <span className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">

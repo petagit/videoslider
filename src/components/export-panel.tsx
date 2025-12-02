@@ -379,8 +379,8 @@ export function ExportPanel() {
             </div>
 
             {audio && (
-              <div className="flex items-center justify-between rounded-md border bg-card p-2 text-xs">
-                <div className="flex items-center gap-2 overflow-hidden">
+              <div className="flex min-w-0 items-center justify-between gap-2 rounded-md border bg-card p-2 text-xs">
+                <div className="flex min-w-0 items-center gap-2 overflow-hidden">
                   <Music className="h-3.5 w-3.5 shrink-0 text-primary" />
                   <span className="truncate">{audio.name}</span>
                 </div>
@@ -413,7 +413,7 @@ export function ExportPanel() {
                         type="button"
                         onClick={() => handleSelectPreset(preset)}
                         className={cn(
-                          "flex items-center gap-2 rounded-md border p-2 text-left text-xs transition-all",
+                          "flex min-w-0 items-center gap-2 rounded-md border p-2 text-left text-xs transition-all",
                           isSelected
                             ? "border-primary bg-primary/5 text-primary"
                             : "bg-background hover:bg-muted"

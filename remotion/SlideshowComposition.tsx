@@ -19,6 +19,7 @@ export interface SlideshowCompositionProps {
     audio?: string;
     audioLoop?: boolean;
     audioDuration?: number;
+    aspectRatio?: string;
 }
 
 export const SlideshowComposition: React.FC<SlideshowCompositionProps> = ({

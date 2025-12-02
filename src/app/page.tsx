@@ -11,7 +11,7 @@ export default function Home() {
       <ResizablePanelGroup direction="horizontal" autoSaveId="video-editor-main-layout">
         <ResizablePanel defaultSize={25} minSize={20} maxSize={40} className="bg-muted/10">
           <ScrollArea className="h-full">
-            <div className="flex flex-col gap-6 p-6">
+            <div className="flex min-w-0 flex-col gap-6 p-4">
               <MediaPanel />
               <OverlayPanel />
               <ExportPanel />

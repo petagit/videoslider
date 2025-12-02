@@ -26,6 +26,13 @@ import {
 } from "lucide-react";
 import { ResizableHandle, ResizablePanel, ResizablePanelGroup } from "@/components/ui/resizable";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import {
+    Select,
+    SelectContent,
+    SelectItem,
+    SelectTrigger,
+    SelectValue,
+} from "@/components/ui/select";
 
 interface MusicPreset {
     id: string;
@@ -81,6 +88,7 @@ const extractColor = async (imageUrl: string): Promise<string> => {
 
 export default function SlideshowPage() {
     const [images, setImages] = useState<SlideImage[]>([]);
+    const [aspectRatio, setAspectRatio] = useState("9:16");
     const [durationPerSlide, setDurationPerSlide] = useState(1.5);
     const [isGenerating, setIsGenerating] = useState(false);
     const [videoUrl, setVideoUrl] = useState<string | null>(null);
@@ -395,6 +403,7 @@ export default function SlideshowPage() {
                 audioLoop,
                 audioDuration: finalAudioDuration,
                 renderMode,
+                aspectRatio,
             };
 
             // Log payload without massive base64 strings
@@ -510,7 +519,7 @@ export default function SlideshowPage() {
             <ResizablePanelGroup direction="horizontal" autoSaveId="video-editor-slideshow-layout">
                 <ResizablePanel defaultSize={25} minSize={20} maxSize={40} className="bg-muted/30">
                     <ScrollArea className="h-full">
-                        <div className="flex flex-col gap-6 p-6">
+                        <div className="flex min-w-0 flex-col gap-6 p-4">
                             {/* Media Panel */}
                             <Card>
                                 <CardHeader className="pb-3">
@@ -626,6 +635,19 @@ export default function SlideshowPage() {
                                             value={[durationPerSlide]}
                                             onValueChange={([val]) => setDurationPerSlide(val)}
                                         />
+                                    </div>
+
+                                    <div className="space-y-3">
+                                        <Label className="text-xs font-medium uppercase tracking-wider text-muted-foreground">Aspect Ratio</Label>
+                                        <Select value={aspectRatio} onValueChange={setAspectRatio}>
+                                            <SelectTrigger>
+                                                <SelectValue placeholder="Select aspect ratio" />
+                                            </SelectTrigger>
+                                            <SelectContent>
+                                                <SelectItem value="9:16">Portrait (9:16) - TikTok/Reels</SelectItem>
+                                                <SelectItem value="16:9">Landscape (16:9) - YouTube</SelectItem>
+                                            </SelectContent>
+                                        </Select>
                                     </div>
 
                                     <Separator />
