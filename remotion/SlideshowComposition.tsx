@@ -97,6 +97,14 @@ const Slide: React.FC<{
     src: string;
     color?: string;
 }> = ({ src, color }) => {
+    if (typeof src !== "string") {
+        console.error("[Slide] Invalid src:", src);
+        return (
+            <AbsoluteFill style={{ backgroundColor: "red", justifyContent: "center", alignItems: "center" }}>
+                Invalid Image Source
+            </AbsoluteFill>
+        );
+    }
     return (
         <AbsoluteFill style={{ backgroundColor: color || "black" }}>
             <Img

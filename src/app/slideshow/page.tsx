@@ -849,7 +849,7 @@ export default function SlideshowPage() {
                                     inputProps={{
                                         images: playerImages,
                                         durationPerSlide,
-                                        audioUrl: previewAudio,
+                                        audio: previewAudio,
                                     }}
                                     durationInFrames={durationInFrames}
                                     fps={fps}
