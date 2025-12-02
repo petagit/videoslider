@@ -6,7 +6,9 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "./ui/
 import { Button } from "./ui/button";
 import { Label } from "./ui/label";
 import { Input } from "./ui/input";
-import { ChevronDown } from "lucide-react";
+import { Slider } from "./ui/slider";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "./ui/select";
+import { ChevronDown, AlignLeft, AlignCenter, AlignRight } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 export function OverlayPanel() {
@@ -33,36 +35,6 @@ export function OverlayPanel() {
     setOverlayMarkdown(event.target.value);
   };
 
-  const handleFontSize = (event: ChangeEvent<HTMLInputElement>) => {
-    setOverlayFontSize(Number(event.target.value));
-  };
-
-  const handleWidth = (event: ChangeEvent<HTMLInputElement>) => {
-    setOverlayMaxWidth(Number(event.target.value));
-  };
-
-  const handleColor = (event: ChangeEvent<HTMLInputElement>) => {
-    setOverlayColor(event.target.value);
-  };
-
-  const handleBackground = (event: ChangeEvent<HTMLInputElement>) => {
-    const value = event.target.value;
-    setOverlayBackground(value === "" ? undefined : value);
-  };
-
-  const handleBorderColor = (event: ChangeEvent<HTMLInputElement>) => {
-    setOverlayBorder({ borderColor: event.target.value });
-  };
-  const handleBorderWidth = (event: ChangeEvent<HTMLInputElement>) => {
-    setOverlayBorder({ borderWidthPx: Number(event.target.value) });
-  };
-  const handleBorderRadius = (event: ChangeEvent<HTMLInputElement>) => {
-    setOverlayBorder({ borderRadiusPx: Number(event.target.value) });
-  };
-  const handleBorderStyle = (event: ChangeEvent<HTMLSelectElement>) => {
-    setOverlayBorder({ borderStyle: event.target.value as typeof borderStyle });
-  };
-
   return (
     <Card>
       <CardHeader className="pb-3">
@@ -72,7 +44,7 @@ export function OverlayPanel() {
         <CardDescription className="text-xs">Markdown text overlay.</CardDescription>
       </CardHeader>
 
-      <CardContent className="space-y-3">
+      <CardContent className="space-y-4">
         <div className="flex flex-col gap-2">
           <Label className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
             Markdown
@@ -97,139 +69,180 @@ export function OverlayPanel() {
             <ChevronDown className={cn("h-4 w-4 transition-transform", isTextSettingsOpen && "rotate-180")} />
           </Button>
           {isTextSettingsOpen && (
-            <div className="flex flex-col gap-2 px-2.5 pb-2.5">
-              {/* Font size and max width sliders - keep existing for now */}
-              <div className="grid grid-cols-2 gap-2">
-                <label className="flex flex-col gap-1.5 rounded-lg bg-muted p-2.5">
-                  <span className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
-                    Font size
-                  </span>
-                  <input
-                    type="range"
+            <div className="flex flex-col gap-4 px-3 pb-4">
+              {/* Font size and max width sliders */}
+              <div className="grid gap-4">
+                <div className="space-y-2">
+                  <div className="flex items-center justify-between">
+                    <span className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
+                      Font size
+                    </span>
+                    <span className="text-xs text-muted-foreground">{fontSizePx}px</span>
+                  </div>
+                  <Slider
                     min={14}
                     max={64}
-                    value={fontSizePx}
-                    onChange={handleFontSize}
+                    step={1}
+                    value={[fontSizePx]}
+                    onValueChange={([val]) => setOverlayFontSize(val)}
                   />
-                  <span className="text-xs text-muted-foreground">{fontSizePx}px</span>
-                </label>
-                <label className="flex flex-col gap-1.5 rounded-lg bg-muted p-2.5">
-                  <span className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
-                    Max width
-                  </span>
-                  <input
-                    type="range"
+                </div>
+
+                <div className="space-y-2">
+                  <div className="flex items-center justify-between">
+                    <span className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
+                      Max width
+                    </span>
+                    <span className="text-xs text-muted-foreground">{maxWidthPct}%</span>
+                  </div>
+                  <Slider
                     min={20}
                     max={100}
-                    value={maxWidthPct}
-                    onChange={handleWidth}
+                    step={1}
+                    value={[maxWidthPct]}
+                    onValueChange={([val]) => setOverlayMaxWidth(val)}
                   />
-                  <span className="text-xs text-muted-foreground">{maxWidthPct}% of stage</span>
-                </label>
+                </div>
               </div>
 
-              <div className="grid grid-cols-2 gap-2">
-                <label className="flex flex-col gap-1.5 rounded-lg bg-muted p-2.5">
-                  <span className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
+              <div className="grid grid-cols-2 gap-3">
+                <div className="space-y-1.5">
+                  <span className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
                     Text color
                   </span>
                   <div className="flex items-center gap-2">
-                    <input
-                      type="color"
-                      value={color}
-                      onChange={handleColor}
-                      className="h-8 w-8 cursor-pointer rounded"
-                    />
+                    <div className="relative h-8 w-8 overflow-hidden rounded-md border shadow-sm">
+                      <input
+                        type="color"
+                        value={color}
+                        onChange={(e) => setOverlayColor(e.target.value)}
+                        className="absolute -left-1/2 -top-1/2 h-[200%] w-[200%] cursor-pointer p-0"
+                      />
+                    </div>
                     <Input
                       type="text"
                       value={color}
-                      onChange={handleColor}
+                      onChange={(e) => setOverlayColor(e.target.value)}
                       className="h-8 flex-1 text-xs"
                     />
                   </div>
-                </label>
-                <label className="flex flex-col gap-1.5 rounded-lg bg-muted p-2.5">
-                  <span className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
+                </div>
+
+                <div className="space-y-1.5">
+                  <span className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
                     Background
                   </span>
                   <div className="flex items-center gap-2">
-                    <input
-                      type="color"
-                      value={background ?? "#0f172a"}
-                      onChange={handleBackground}
-                      className="h-8 w-8 cursor-pointer rounded"
-                    />
+                    <div className="relative h-8 w-8 overflow-hidden rounded-md border shadow-sm">
+                      <input
+                        type="color"
+                        value={background ?? "#0f172a"}
+                        onChange={(e) => setOverlayBackground(e.target.value)}
+                        className="absolute -left-1/2 -top-1/2 h-[200%] w-[200%] cursor-pointer p-0"
+                      />
+                    </div>
                     <Input
                       type="text"
                       value={background ?? ""}
-                      onChange={handleBackground}
-                      placeholder="rgba(...) or hex"
+                      onChange={(e) => setOverlayBackground(e.target.value === "" ? undefined : e.target.value)}
+                      placeholder="None"
                       className="h-8 flex-1 text-xs"
                     />
                   </div>
-                  <span className="mt-0.5 text-[11px] text-muted-foreground">Leave blank for transparent.</span>
-                </label>
+                </div>
               </div>
 
-              <div className="grid grid-cols-2 gap-2">
-                <label className="flex flex-col gap-1.5 rounded-lg bg-muted p-2.5">
-                  <span className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">Border width</span>
-                  <input type="range" min={0} max={16} value={borderWidthPx} onChange={handleBorderWidth} />
-                  <span className="text-xs text-muted-foreground">{borderWidthPx}px</span>
-                </label>
-                <label className="flex flex-col gap-1.5 rounded-lg bg-muted p-2.5">
-                  <span className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">Border radius</span>
-                  <input type="range" min={0} max={48} value={borderRadiusPx} onChange={handleBorderRadius} />
-                  <span className="text-xs text-muted-foreground">{borderRadiusPx}px</span>
-                </label>
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <div className="flex items-center justify-between">
+                    <span className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Border width</span>
+                    <span className="text-xs text-muted-foreground">{borderWidthPx}px</span>
+                  </div>
+                  <Slider
+                    min={0}
+                    max={16}
+                    step={1}
+                    value={[borderWidthPx]}
+                    onValueChange={([val]) => setOverlayBorder({ borderWidthPx: val })}
+                  />
+                </div>
+
+                <div className="space-y-2">
+                  <div className="flex items-center justify-between">
+                    <span className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Radius</span>
+                    <span className="text-xs text-muted-foreground">{borderRadiusPx}px</span>
+                  </div>
+                  <Slider
+                    min={0}
+                    max={48}
+                    step={1}
+                    value={[borderRadiusPx]}
+                    onValueChange={([val]) => setOverlayBorder({ borderRadiusPx: val })}
+                  />
+                </div>
               </div>
 
-              <div className="grid grid-cols-2 gap-2">
-                <label className="flex flex-col gap-1.5 rounded-lg bg-muted p-2.5">
-                  <span className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">Border color</span>
+              <div className="grid grid-cols-2 gap-3">
+                <div className="space-y-1.5">
+                  <span className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Border color</span>
                   <div className="flex items-center gap-2">
-                    <input type="color" value={borderColor} onChange={handleBorderColor} className="h-8 w-8 cursor-pointer rounded" />
+                    <div className="relative h-8 w-8 overflow-hidden rounded-md border shadow-sm">
+                      <input
+                        type="color"
+                        value={borderColor}
+                        onChange={(e) => setOverlayBorder({ borderColor: e.target.value })}
+                        className="absolute -left-1/2 -top-1/2 h-[200%] w-[200%] cursor-pointer p-0"
+                      />
+                    </div>
                     <Input
                       type="text"
                       value={borderColor}
-                      onChange={handleBorderColor}
+                      onChange={(e) => setOverlayBorder({ borderColor: e.target.value })}
                       className="h-8 flex-1 text-xs"
                     />
                   </div>
-                </label>
-                <label className="flex flex-col gap-1.5 rounded-lg bg-muted p-2.5">
-                  <span className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">Border style</span>
-                  <select
+                </div>
+
+                <div className="space-y-1.5">
+                  <span className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Border style</span>
+                  <Select
                     value={borderStyle}
-                    onChange={handleBorderStyle}
-                    className="rounded-lg border bg-background px-3 py-2 text-xs text-foreground focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
+                    onValueChange={(val) => setOverlayBorder({ borderStyle: val as typeof borderStyle })}
                   >
-                    <option value="none">None</option>
-                    <option value="solid">Solid</option>
-                    <option value="dashed">Dashed</option>
-                    <option value="dotted">Dotted</option>
-                  </select>
-                </label>
+                    <SelectTrigger className="h-8 text-xs">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="none">None</SelectItem>
+                      <SelectItem value="solid">Solid</SelectItem>
+                      <SelectItem value="dashed">Dashed</SelectItem>
+                      <SelectItem value="dotted">Dotted</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
               </div>
             </div>
           )}
         </div>
 
         <div className="flex items-center gap-2">
-          {([
-            ["left", "Left"],
-            ["center", "Center"],
-            ["right", "Right"],
-          ] as const).map(([value, label]) => (
-            <Button
-              key={value}
-              variant={align === value ? "default" : "secondary"}
-              onClick={() => setOverlayAlignment(value)}
-              className="flex-1 text-xs uppercase tracking-wider"
-            >
-              {label}
-            </Button>
-          ))}
+          <div className="flex w-full items-center rounded-lg border bg-muted/50 p-1">
+            {([
+              ["left", AlignLeft],
+              ["center", AlignCenter],
+              ["right", AlignRight],
+            ] as const).map(([value, Icon]) => (
+              <Button
+                key={value}
+                variant={align === value ? "default" : "ghost"}
+                size="sm"
+                onClick={() => setOverlayAlignment(value)}
+                className="flex-1 h-7"
+              >
+                <Icon className="h-4 w-4" />
+              </Button>
+            ))}
+          </div>
         </div>
       </CardContent>
     </Card>

@@ -24,6 +24,8 @@ import {
     Copy,
     Check
 } from "lucide-react";
+import { ResizableHandle, ResizablePanel, ResizablePanelGroup } from "@/components/ui/resizable";
+import { ScrollArea } from "@/components/ui/scroll-area";
 
 interface MusicPreset {
     id: string;
@@ -504,334 +506,339 @@ export default function SlideshowPage() {
     const playerImages = images.map(img => ({ src: img.src, color: img.color }));
 
     return (
-        <div className="flex h-full overflow-hidden bg-background text-foreground">
-            <div className="flex flex-1 overflow-hidden">
-                <aside className="flex w-[320px] shrink-0 flex-col gap-6 overflow-y-auto border-r bg-muted/30 p-6">
-                    {/* Media Panel */}
-                    <Card>
-                        <CardHeader className="pb-3">
-                            <div className="flex items-center justify-between">
-                                <CardTitle className="text-sm font-medium uppercase tracking-wider text-muted-foreground">Media</CardTitle>
-                                <Button
-                                    variant="ghost"
-                                    size="sm"
-                                    onClick={clearImages}
-                                    disabled={images.length === 0}
-                                    className="h-6 px-2 text-xs uppercase tracking-wider"
-                                >
-                                    Clear
-                                </Button>
-                            </div>
-                            <CardDescription className="text-xs">Upload and arrange your images.</CardDescription>
-                        </CardHeader>
-                        <CardContent>
-                            <div
-                                className={cn(
-                                    "relative flex flex-col items-center justify-center rounded-lg border-2 border-dashed p-6 transition-colors",
-                                    dragActive ? "border-primary bg-primary/5" : "border-muted-foreground/25 hover:border-primary/50"
-                                )}
-                                onDragEnter={handleDrag}
-                                onDragLeave={handleDrag}
-                                onDragOver={handleDrag}
-                                onDrop={handleDrop}
-                            >
-                                <Input
-                                    type="file"
-                                    multiple
-                                    accept="image/*"
-                                    onChange={handleImageUpload}
-                                    className="absolute inset-0 h-full w-full cursor-pointer opacity-0"
-                                />
-                                <div className="flex flex-col items-center justify-center text-center space-y-2">
-                                    <div className="rounded-full bg-muted p-2">
-                                        <Upload className="h-4 w-4 text-muted-foreground" />
-                                    </div>
-                                    <div className="space-y-1">
-                                        <p className="text-xs font-medium">Drag & drop images</p>
-                                        <p className="text-[10px] text-muted-foreground uppercase tracking-wider">or click to browse</p>
-                                    </div>
-                                </div>
-                            </div>
-
-                            {images.length > 0 && (
-                                <div className="mt-4 grid grid-cols-3 gap-2">
-                                    {images.map((img, i) => (
-                                        <div
-                                            key={i}
-                                            draggable
-                                            onDragStart={(e) => handleImageDragStart(e, i)}
-                                            onDragOver={(e) => handleImageDragOver(e, i)}
-                                            onDragLeave={handleImageDragLeave}
-                                            onDrop={(e) => handleImageDrop(e, i)}
-                                            onDragEnd={handleImageDragEnd}
-                                            className={cn(
-                                                "group relative aspect-square overflow-hidden rounded-md border bg-background transition-all",
-                                                draggedIndex === i ? "opacity-50 ring-2 ring-primary" : "",
-                                                dragOverIndex === i ? "scale-105 ring-2 ring-primary" : "hover:border-primary/50"
-                                            )}
+        <div className="h-screen overflow-hidden bg-background text-foreground">
+            <ResizablePanelGroup direction="horizontal" autoSaveId="video-editor-slideshow-layout">
+                <ResizablePanel defaultSize={25} minSize={20} maxSize={40} className="bg-muted/30">
+                    <ScrollArea className="h-full">
+                        <div className="flex flex-col gap-6 p-6">
+                            {/* Media Panel */}
+                            <Card>
+                                <CardHeader className="pb-3">
+                                    <div className="flex items-center justify-between">
+                                        <CardTitle className="text-sm font-medium uppercase tracking-wider text-muted-foreground">Media</CardTitle>
+                                        <Button
+                                            variant="ghost"
+                                            size="sm"
+                                            onClick={clearImages}
+                                            disabled={images.length === 0}
+                                            className="h-6 px-2 text-xs uppercase tracking-wider"
                                         >
-                                            <img
-                                                src={img.src}
-                                                alt={`Slide ${i}`}
-                                                className="h-full w-full object-cover"
-                                            />
-                                            <Button
-                                                variant="destructive"
-                                                size="icon"
-                                                onClick={(e) => {
-                                                    e.stopPropagation();
-                                                    removeImage(i);
-                                                }}
-                                                className="absolute left-1 top-1 h-5 w-5 opacity-0 transition-opacity group-hover:opacity-100"
-                                            >
-                                                <X className="h-3 w-3" />
-                                            </Button>
-                                            <div className="absolute bottom-0 right-0 rounded-tl bg-black/60 px-1.5 py-0.5 text-[9px] text-white backdrop-blur-sm">
-                                                {i + 1}
-                                            </div>
-                                            <div
-                                                className="absolute right-1 top-1 h-2.5 w-2.5 rounded-full border border-white/50 shadow-sm"
-                                                style={{ backgroundColor: img.color }}
-                                            />
-                                        </div>
-                                    ))}
-                                </div>
-                            )}
-                            <p className="mt-3 text-center text-[10px] text-muted-foreground">
-                                {images.length} image{images.length !== 1 ? 's' : ''} selected
-                            </p>
-                        </CardContent>
-                    </Card>
-
-                    {/* Settings Panel */}
-                    <Card>
-                        <CardHeader className="pb-3">
-                            <CardTitle className="text-sm font-medium uppercase tracking-wider text-muted-foreground">Settings</CardTitle>
-                            <CardDescription className="text-xs">Customize duration and audio.</CardDescription>
-                        </CardHeader>
-                        <CardContent className="space-y-6">
-                            <div className="space-y-3">
-                                <div className="flex items-center justify-between">
-                                    <Label className="text-xs font-medium uppercase tracking-wider text-muted-foreground">Slide Duration</Label>
-                                    <span className="font-mono text-xs text-muted-foreground">{durationPerSlide}s</span>
-                                </div>
-                                <Slider
-                                    min={0.5}
-                                    max={10}
-                                    step={0.5}
-                                    value={[durationPerSlide]}
-                                    onValueChange={([val]) => setDurationPerSlide(val)}
-                                />
-                            </div>
-
-                            <Separator />
-
-                            <div className="space-y-3">
-                                <Label className="text-xs font-medium uppercase tracking-wider text-muted-foreground">Background Music</Label>
-
-                                <div className="relative">
-                                    <Input
-                                        type="file"
-                                        accept="audio/*"
-                                        onChange={handleMusicUpload}
-                                        className="hidden"
-                                        id="music-upload"
-                                    />
-                                    <Label
-                                        htmlFor="music-upload"
-                                        className="flex cursor-pointer items-center gap-2 rounded-md border border-dashed bg-muted/50 p-2 hover:bg-muted"
+                                            Clear
+                                        </Button>
+                                    </div>
+                                    <CardDescription className="text-xs">Upload and arrange your images.</CardDescription>
+                                </CardHeader>
+                                <CardContent>
+                                    <div
+                                        className={cn(
+                                            "relative flex flex-col items-center justify-center rounded-lg border-2 border-dashed p-6 transition-colors",
+                                            dragActive ? "border-primary bg-primary/5" : "border-muted-foreground/25 hover:border-primary/50"
+                                        )}
+                                        onDragEnter={handleDrag}
+                                        onDragLeave={handleDrag}
+                                        onDragOver={handleDrag}
+                                        onDrop={handleDrop}
                                     >
-                                        <Music className="h-4 w-4 text-muted-foreground" />
-                                        <span className="flex-1 truncate text-xs text-muted-foreground">
-                                            {uploadedMusicFile ? uploadedMusicFile.name : "Upload audio file"}
-                                        </span>
-                                        <span className="rounded bg-muted px-2 py-0.5 text-[10px] font-medium text-muted-foreground">
-                                            Browse
-                                        </span>
-                                    </Label>
-                                </div>
-
-                                <div className="space-y-2">
-                                    <span className="text-[10px] font-medium uppercase tracking-wider text-muted-foreground">Library</span>
-                                    <div className="max-h-40 space-y-1 overflow-y-auto pr-1">
-                                        {musicPresets.map((preset) => (
-                                            <div key={preset.id} className="flex items-center gap-2">
-                                                <Button
-                                                    variant="outline"
-                                                    size="icon"
-                                                    className="h-8 w-8 shrink-0"
-                                                    onClick={() => togglePreview(preset.url, preset.id)}
-                                                >
-                                                    {previewingAudio === preset.id ? (
-                                                        <Pause className="h-3 w-3" />
-                                                    ) : (
-                                                        <Play className="h-3 w-3 ml-0.5" />
-                                                    )}
-                                                </Button>
-                                                <Button
-                                                    variant={selectedMusic === preset.filename ? "secondary" : "ghost"}
-                                                    className={cn(
-                                                        "h-8 flex-1 justify-start text-xs",
-                                                        selectedMusic === preset.filename && "bg-primary/10 text-primary hover:bg-primary/20"
-                                                    )}
-                                                    onClick={() => handlePresetSelect(preset.filename)}
-                                                >
-                                                    {preset.name}
-                                                </Button>
-                                            </div>
-                                        ))}
-                                    </div>
-                                </div>
-
-                                <div className="flex items-center gap-2">
-                                    <input
-                                        type="checkbox"
-                                        id="audio-loop"
-                                        checked={audioLoop}
-                                        onChange={(e) => setAudioLoop(e.target.checked)}
-                                        className="h-3.5 w-3.5 rounded border-primary text-primary focus:ring-primary"
-                                    />
-                                    <Label htmlFor="audio-loop" className="text-[10px] font-medium uppercase tracking-wider text-muted-foreground">
-                                        Loop audio {audioDuration ? `(${audioDuration.toFixed(1)}s)` : ""}
-                                    </Label>
-                                </div>
-                            </div>
-                        </CardContent>
-                    </Card>
-
-                    {/* Export Panel */}
-                    <Card>
-                        <CardHeader className="pb-3">
-                            <CardTitle className="text-sm font-medium uppercase tracking-wider text-muted-foreground">Export</CardTitle>
-                            <CardDescription className="text-xs">Render and download your video.</CardDescription>
-                        </CardHeader>
-                        <CardContent className="space-y-4">
-                            {isGenerating ? (
-                                <div className="rounded-lg border bg-muted/50 p-4">
-                                    <div className="mb-2 flex items-center justify-between text-[10px] font-medium uppercase tracking-wider text-muted-foreground">
-                                        <span className="flex items-center gap-2">
-                                            <Loader2 className="h-3 w-3 animate-spin" />
-                                            {renderStatus}
-                                        </span>
-                                        <span className="font-mono">{Math.floor(elapsedTime / 60)}:{(elapsedTime % 60).toString().padStart(2, '0')}</span>
-                                    </div>
-                                    <div className="h-1.5 w-full overflow-hidden rounded-full bg-muted">
-                                        <div
-                                            className="h-full bg-primary transition-all duration-300 ease-out"
-                                            style={{ width: `${Math.max(5, progress * 100)}%` }}
+                                        <Input
+                                            type="file"
+                                            multiple
+                                            accept="image/*"
+                                            onChange={handleImageUpload}
+                                            className="absolute inset-0 h-full w-full cursor-pointer opacity-0"
                                         />
-                                    </div>
-                                </div>
-                            ) : (
-                                <div className="grid gap-2">
-                                    <Button
-                                        onClick={() => handleGenerate('lambda')}
-                                        disabled={images.length === 0}
-                                        className="w-full"
-                                    >
-                                        <Film className="mr-2 h-4 w-4" />
-                                        Render with Lambda
-                                    </Button>
-                                    <Button
-                                        variant="outline"
-                                        onClick={() => handleGenerate('local')}
-                                        disabled={images.length === 0}
-                                        className="w-full"
-                                    >
-                                        Render Locally
-                                    </Button>
-                                </div>
-                            )}
-
-                            {videoUrl && (
-                                <div className="animate-in fade-in slide-in-from-top-2 space-y-3">
-                                    <div className="rounded-md border border-emerald-500/20 bg-emerald-500/10 p-3 text-center">
-                                        <p className="flex items-center justify-center gap-2 text-xs font-medium text-emerald-600 dark:text-emerald-400">
-                                            <Check className="h-3 w-3" />
-                                            Video Ready!
-                                        </p>
-                                    </div>
-                                    <div className="grid gap-2">
-                                        <Button
-                                            variant="secondary"
-                                            asChild
-                                            className="w-full cursor-pointer"
-                                        >
-                                            <a href={videoUrl} download>
-                                                <Download className="mr-2 h-4 w-4" />
-                                                Download MP4
-                                            </a>
-                                        </Button>
-                                        <Button
-                                            variant="outline"
-                                            onClick={handleUploadToCdn}
-                                            disabled={isCdnUploading}
-                                            className="w-full"
-                                        >
-                                            {isCdnUploading ? (
-                                                <Loader2 className="mr-2 h-3 w-3 animate-spin" />
-                                            ) : (
-                                                <Upload className="mr-2 h-3 w-3" />
-                                            )}
-                                            {isCdnUploading ? "Uploading..." : "Upload to CDN"}
-                                        </Button>
-                                    </div>
-
-                                    {cdnUrl && (
-                                        <div className="rounded-md border bg-muted/50 p-2">
-                                            <p className="mb-1 text-[10px] font-medium uppercase text-muted-foreground">CDN Link</p>
-                                            <div className="flex gap-1">
-                                                <Input
-                                                    readOnly
-                                                    value={cdnUrl}
-                                                    className="h-7 text-xs"
-                                                    onClick={(e) => e.currentTarget.select()}
-                                                />
-                                                <Button
-                                                    variant="ghost"
-                                                    size="icon"
-                                                    className="h-7 w-7"
-                                                    onClick={() => {
-                                                        navigator.clipboard.writeText(cdnUrl);
-                                                        toast.success("Copied to clipboard");
-                                                    }}
-                                                >
-                                                    <Copy className="h-3 w-3" />
-                                                </Button>
+                                        <div className="flex flex-col items-center justify-center text-center space-y-2">
+                                            <div className="rounded-full bg-muted p-2">
+                                                <Upload className="h-4 w-4 text-muted-foreground" />
                                             </div>
+                                            <div className="space-y-1">
+                                                <p className="text-xs font-medium">Drag & drop images</p>
+                                                <p className="text-[10px] text-muted-foreground uppercase tracking-wider">or click to browse</p>
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    {images.length > 0 && (
+                                        <div className="mt-4 grid grid-cols-3 gap-2">
+                                            {images.map((img, i) => (
+                                                <div
+                                                    key={i}
+                                                    draggable
+                                                    onDragStart={(e) => handleImageDragStart(e, i)}
+                                                    onDragOver={(e) => handleImageDragOver(e, i)}
+                                                    onDragLeave={handleImageDragLeave}
+                                                    onDrop={(e) => handleImageDrop(e, i)}
+                                                    onDragEnd={handleImageDragEnd}
+                                                    className={cn(
+                                                        "group relative aspect-square overflow-hidden rounded-md border bg-background transition-all",
+                                                        draggedIndex === i ? "opacity-50 ring-2 ring-primary" : "",
+                                                        dragOverIndex === i ? "scale-105 ring-2 ring-primary" : "hover:border-primary/50"
+                                                    )}
+                                                >
+                                                    <img
+                                                        src={img.src}
+                                                        alt={`Slide ${i}`}
+                                                        className="h-full w-full object-cover"
+                                                    />
+                                                    <Button
+                                                        variant="destructive"
+                                                        size="icon"
+                                                        onClick={(e) => {
+                                                            e.stopPropagation();
+                                                            removeImage(i);
+                                                        }}
+                                                        className="absolute left-1 top-1 h-5 w-5 opacity-0 transition-opacity group-hover:opacity-100"
+                                                    >
+                                                        <X className="h-3 w-3" />
+                                                    </Button>
+                                                    <div className="absolute bottom-0 right-0 rounded-tl bg-black/60 px-1.5 py-0.5 text-[9px] text-white backdrop-blur-sm">
+                                                        {i + 1}
+                                                    </div>
+                                                    <div
+                                                        className="absolute right-1 top-1 h-2.5 w-2.5 rounded-full border border-white/50 shadow-sm"
+                                                        style={{ backgroundColor: img.color }}
+                                                    />
+                                                </div>
+                                            ))}
                                         </div>
                                     )}
-                                </div>
-                            )}
-                        </CardContent>
-                    </Card>
-                </aside>
+                                    <p className="mt-3 text-center text-[10px] text-muted-foreground">
+                                        {images.length} image{images.length !== 1 ? 's' : ''} selected
+                                    </p>
+                                </CardContent>
+                            </Card>
 
-                <main className="flex flex-1 flex-col items-center justify-center overflow-hidden bg-muted/10 p-8">
-                    <div className="relative flex aspect-[9/16] h-full max-h-[800px] w-auto flex-col overflow-hidden rounded-xl border bg-black shadow-2xl">
-                        <Player
-                            component={SlideshowComposition}
-                            inputProps={{
-                                images: playerImages,
-                                durationPerSlide,
-                                audio: previewAudio,
-                            }}
-                            durationInFrames={durationInFrames}
-                            fps={fps}
-                            compositionWidth={1080}
-                            compositionHeight={1920}
-                            style={{
-                                width: "100%",
-                                height: "100%",
-                            }}
-                            controls
-                        />
+                            {/* Settings Panel */}
+                            <Card>
+                                <CardHeader className="pb-3">
+                                    <CardTitle className="text-sm font-medium uppercase tracking-wider text-muted-foreground">Settings</CardTitle>
+                                    <CardDescription className="text-xs">Customize duration and audio.</CardDescription>
+                                </CardHeader>
+                                <CardContent className="space-y-6">
+                                    <div className="space-y-3">
+                                        <div className="flex items-center justify-between">
+                                            <Label className="text-xs font-medium uppercase tracking-wider text-muted-foreground">Slide Duration</Label>
+                                            <span className="font-mono text-xs text-muted-foreground">{durationPerSlide}s</span>
+                                        </div>
+                                        <Slider
+                                            min={0.5}
+                                            max={10}
+                                            step={0.5}
+                                            value={[durationPerSlide]}
+                                            onValueChange={([val]) => setDurationPerSlide(val)}
+                                        />
+                                    </div>
+
+                                    <Separator />
+
+                                    <div className="space-y-3">
+                                        <Label className="text-xs font-medium uppercase tracking-wider text-muted-foreground">Background Music</Label>
+
+                                        <div className="relative">
+                                            <Input
+                                                type="file"
+                                                accept="audio/*"
+                                                onChange={handleMusicUpload}
+                                                className="hidden"
+                                                id="music-upload"
+                                            />
+                                            <Label
+                                                htmlFor="music-upload"
+                                                className="flex cursor-pointer items-center gap-2 rounded-md border border-dashed bg-muted/50 p-2 hover:bg-muted"
+                                            >
+                                                <Music className="h-4 w-4 text-muted-foreground" />
+                                                <span className="flex-1 truncate text-xs text-muted-foreground">
+                                                    {uploadedMusicFile ? uploadedMusicFile.name : "Upload audio file"}
+                                                </span>
+                                                <span className="rounded bg-muted px-2 py-0.5 text-[10px] font-medium text-muted-foreground">
+                                                    Browse
+                                                </span>
+                                            </Label>
+                                        </div>
+
+                                        <div className="space-y-2">
+                                            <span className="text-[10px] font-medium uppercase tracking-wider text-muted-foreground">Library</span>
+                                            <div className="max-h-40 space-y-1 overflow-y-auto pr-1">
+                                                {musicPresets.map((preset) => (
+                                                    <div key={preset.id} className="flex items-center gap-2">
+                                                        <Button
+                                                            variant="outline"
+                                                            size="icon"
+                                                            className="h-8 w-8 shrink-0"
+                                                            onClick={() => togglePreview(preset.url, preset.id)}
+                                                        >
+                                                            {previewingAudio === preset.id ? (
+                                                                <Pause className="h-3 w-3" />
+                                                            ) : (
+                                                                <Play className="h-3 w-3 ml-0.5" />
+                                                            )}
+                                                        </Button>
+                                                        <Button
+                                                            variant={selectedMusic === preset.filename ? "secondary" : "ghost"}
+                                                            className={cn(
+                                                                "h-8 flex-1 justify-start text-xs",
+                                                                selectedMusic === preset.filename && "bg-primary/10 text-primary hover:bg-primary/20"
+                                                            )}
+                                                            onClick={() => handlePresetSelect(preset.filename)}
+                                                        >
+                                                            {preset.name}
+                                                        </Button>
+                                                    </div>
+                                                ))}
+                                            </div>
+                                        </div>
+
+                                        <div className="flex items-center gap-2">
+                                            <input
+                                                type="checkbox"
+                                                id="audio-loop"
+                                                checked={audioLoop}
+                                                onChange={(e) => setAudioLoop(e.target.checked)}
+                                                className="h-3.5 w-3.5 rounded border-primary text-primary focus:ring-primary"
+                                            />
+                                            <Label htmlFor="audio-loop" className="text-[10px] font-medium uppercase tracking-wider text-muted-foreground">
+                                                Loop audio {audioDuration ? `(${audioDuration.toFixed(1)}s)` : ""}
+                                            </Label>
+                                        </div>
+                                    </div>
+                                </CardContent>
+                            </Card>
+
+                            {/* Export Panel */}
+                            <Card>
+                                <CardHeader className="pb-3">
+                                    <CardTitle className="text-sm font-medium uppercase tracking-wider text-muted-foreground">Export</CardTitle>
+                                    <CardDescription className="text-xs">Render and download your video.</CardDescription>
+                                </CardHeader>
+                                <CardContent className="space-y-4">
+                                    {isGenerating ? (
+                                        <div className="rounded-lg border bg-muted/50 p-4">
+                                            <div className="mb-2 flex items-center justify-between text-[10px] font-medium uppercase tracking-wider text-muted-foreground">
+                                                <span className="flex items-center gap-2">
+                                                    <Loader2 className="h-3 w-3 animate-spin" />
+                                                    {renderStatus}
+                                                </span>
+                                                <span className="font-mono">{Math.floor(elapsedTime / 60)}:{(elapsedTime % 60).toString().padStart(2, '0')}</span>
+                                            </div>
+                                            <div className="h-1.5 w-full overflow-hidden rounded-full bg-muted">
+                                                <div
+                                                    className="h-full bg-primary transition-all duration-300 ease-out"
+                                                    style={{ width: `${Math.max(5, progress * 100)}%` }}
+                                                />
+                                            </div>
+                                        </div>
+                                    ) : (
+                                        <div className="grid gap-2">
+                                            <Button
+                                                onClick={() => handleGenerate('lambda')}
+                                                disabled={images.length === 0}
+                                                className="w-full"
+                                            >
+                                                <Film className="mr-2 h-4 w-4" />
+                                                Render with Lambda
+                                            </Button>
+                                            <Button
+                                                variant="outline"
+                                                onClick={() => handleGenerate('local')}
+                                                disabled={images.length === 0}
+                                                className="w-full"
+                                            >
+                                                Render Locally
+                                            </Button>
+                                        </div>
+                                    )}
+
+                                    {videoUrl && (
+                                        <div className="animate-in fade-in slide-in-from-top-2 space-y-3">
+                                            <div className="rounded-md border border-emerald-500/20 bg-emerald-500/10 p-3 text-center">
+                                                <p className="flex items-center justify-center gap-2 text-xs font-medium text-emerald-600 dark:text-emerald-400">
+                                                    <Check className="h-3 w-3" />
+                                                    Video Ready!
+                                                </p>
+                                            </div>
+                                            <div className="grid gap-2">
+                                                <Button
+                                                    variant="secondary"
+                                                    asChild
+                                                    className="w-full cursor-pointer"
+                                                >
+                                                    <a href={videoUrl} download>
+                                                        <Download className="mr-2 h-4 w-4" />
+                                                        Download MP4
+                                                    </a>
+                                                </Button>
+                                                <Button
+                                                    variant="outline"
+                                                    onClick={handleUploadToCdn}
+                                                    disabled={isCdnUploading}
+                                                    className="w-full"
+                                                >
+                                                    {isCdnUploading ? (
+                                                        <Loader2 className="mr-2 h-3 w-3 animate-spin" />
+                                                    ) : (
+                                                        <Upload className="mr-2 h-3 w-3" />
+                                                    )}
+                                                    {isCdnUploading ? "Uploading..." : "Upload to CDN"}
+                                                </Button>
+                                            </div>
+
+                                            {cdnUrl && (
+                                                <div className="rounded-md border bg-muted/50 p-2">
+                                                    <p className="mb-1 text-[10px] font-medium uppercase text-muted-foreground">CDN Link</p>
+                                                    <div className="flex gap-1">
+                                                        <Input
+                                                            readOnly
+                                                            value={cdnUrl}
+                                                            className="h-7 text-xs"
+                                                            onClick={(e) => e.currentTarget.select()}
+                                                        />
+                                                        <Button
+                                                            variant="ghost"
+                                                            size="icon"
+                                                            className="h-7 w-7"
+                                                            onClick={() => {
+                                                                navigator.clipboard.writeText(cdnUrl);
+                                                                toast.success("Copied to clipboard");
+                                                            }}
+                                                        >
+                                                            <Copy className="h-3 w-3" />
+                                                        </Button>
+                                                    </div>
+                                                </div>
+                                            )}
+                                        </div>
+                                    )}
+                                </CardContent>
+                            </Card>
+                        </div>
+                    </ScrollArea>
+                </ResizablePanel>
+                <ResizableHandle withHandle />
+                <ResizablePanel defaultSize={75}>
+                    <div className="flex h-full flex-col overflow-hidden bg-background">
+                        <div className="flex-1 bg-muted/10 p-8 flex items-center justify-center">
+                            <div className="aspect-video w-full max-w-5xl overflow-hidden rounded-lg border bg-background shadow-sm">
+                                <Player
+                                    component={SlideshowComposition}
+                                    inputProps={{
+                                        images: playerImages,
+                                        durationPerSlide,
+                                        audioUrl: previewAudio,
+                                    }}
+                                    durationInFrames={durationInFrames}
+                                    fps={fps}
+                                    compositionWidth={1920}
+                                    compositionHeight={1080}
+                                    style={{
+                                        width: '100%',
+                                        height: '100%',
+                                    }}
+                                    controls
+                                />
+                            </div>
+                        </div>
                     </div>
-                    <p className="mt-4 text-center text-xs text-muted-foreground">
-                        Preview (9:16 Vertical) • {Math.round(durationInFrames / fps)}s
-                    </p>
-                </main>
-            </div>
+                </ResizablePanel>
+            </ResizablePanelGroup>
         </div>
     );
 }

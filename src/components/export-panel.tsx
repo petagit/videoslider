@@ -4,6 +4,14 @@ import { useCallback, useEffect, useState } from "react";
 
 import { useAppStore } from "../state/store";
 import type { UploadedAudio } from "../state/types";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "./ui/card";
+import { Button } from "./ui/button";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "./ui/select";
+import { Slider } from "./ui/slider";
+import { Checkbox } from "./ui/checkbox";
+import { Progress } from "./ui/progress";
+import { cn } from "@/lib/utils";
+import { Music, Upload, X, Loader2 } from "lucide-react";
 
 interface MusicPreset {
   id: string;
@@ -231,15 +239,6 @@ export function ExportPanel() {
         audioPreset: audio?.origin === "preset" ? audio.name : undefined, // API expects filename for preset? API logic needs check.
         audioLoop,
         audioDuration: audio?.duration,
-        // Actually API logic: if audioPreset is passed, it looks in public/music-presets.
-        // Our audio.name for preset is the filename? Let's check handleSelectPreset.
-        // handleSelectPreset sets name: preset.name. But preset.filename is what we need?
-        // We might need to adjust handleSelectPreset to store filename.
-        // For now let's assume audio.src is the URL, but for preset we want the server to handle it if possible or just pass the URL?
-        // If we pass the public URL of the preset (audio.src), the API will treat it as remote URL and download it. That works!
-        // So we can just pass audio: audio.src (which is the public URL) for presets too.
-        // BUT, the API has specific optimization for presets to upload them to S3 if using Lambda.
-        // Let's stick to passing 'audio' as the URL.
       }),
     });
 
@@ -328,190 +327,204 @@ export function ExportPanel() {
   }, [exportBlocked, format, isExporting, runMp4Export]);
 
   return (
-    <section className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm transition-colors dark:border-slate-800 dark:bg-slate-900/60">
-      <header className="mb-3">
-        <h2 className="text-xs font-semibold uppercase tracking-[0.2em] text-slate-800 dark:text-slate-300">
+    <Card>
+      <CardHeader className="pb-3">
+        <CardTitle className="text-sm font-medium uppercase tracking-wider text-muted-foreground">
           Export
-        </h2>
-        <p className="text-[11px] text-slate-600 dark:text-slate-400">
+        </CardTitle>
+        <CardDescription className="text-xs">
           Render MP4 video.
-        </p>
-      </header>
+        </CardDescription>
+      </CardHeader>
 
-      <div className="flex flex-col gap-3">
-        {/* Music Selection UI - Unchanged */}
-        <div className="flex flex-col gap-2">
-          <span className="text-[11px] font-semibold uppercase tracking-[0.25em] text-slate-600 dark:text-slate-400">
-            Background music (optional)
+      <CardContent className="space-y-4">
+        {/* Music Selection UI */}
+        <div className="space-y-2">
+          <span className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
+            Background music
           </span>
-          <input
-            type="file"
-            accept="audio/*"
-            onChange={(e) => {
-              const file = e.target.files?.[0];
-              if (!file) {
-                setAudio(undefined);
-                return;
-              }
-              const src = URL.createObjectURL(file);
-              const audioPayload: UploadedAudio = {
-                id: `${Date.now()}`,
-                file,
-                src,
-                name: file.name,
-                origin: "upload",
-              };
 
-              const audioObj = new Audio(src);
-              audioObj.onloadedmetadata = () => {
-                setAudio({ ...audioPayload, duration: audioObj.duration });
-              };
-              setAudio(audioPayload);
-            }}
-            className="rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-700 focus:border-sky-400 focus:outline-none dark:border-slate-700 dark:bg-slate-950/60 dark:text-slate-100"
-          />
-          {audio && audio.origin === "upload" ? (
-            <span className="text-xs text-slate-600 dark:text-slate-400">{audio.name}</span>
-          ) : null}
+          <div className="flex flex-col gap-2">
+            <div className="flex items-center gap-2">
+              <label className="flex h-9 w-full cursor-pointer items-center justify-center gap-2 rounded-md border border-dashed bg-muted/50 text-xs text-muted-foreground transition-colors hover:bg-muted">
+                <Upload className="h-3.5 w-3.5" />
+                <span>Upload audio</span>
+                <input
+                  type="file"
+                  accept="audio/*"
+                  onChange={(e) => {
+                    const file = e.target.files?.[0];
+                    if (!file) {
+                      setAudio(undefined);
+                      return;
+                    }
+                    const src = URL.createObjectURL(file);
+                    const audioPayload: UploadedAudio = {
+                      id: `${Date.now()}`,
+                      file,
+                      src,
+                      name: file.name,
+                      origin: "upload",
+                    };
 
-          <div className="mt-2 space-y-2">
-            <span className="text-[10px] font-semibold uppercase tracking-[0.25em] text-slate-500 dark:text-slate-400">
-              Music library
-            </span>
-            {isLoadingPresets ? (
-              <div className="rounded-lg border border-dashed border-slate-300 bg-slate-100 p-3 text-center text-[11px] text-slate-600 dark:border-slate-800 dark:bg-slate-950/50 dark:text-slate-400">
-                Loading presets…
-              </div>
-            ) : musicPresets.length > 0 ? (
-              <div className="grid grid-cols-2 gap-2">
-                {musicPresets.map((preset) => {
-                  const isSelected = audio?.origin === "preset" && audio?.id === `preset-${preset.id}`;
-                  return (
-                    <button
-                      key={preset.id}
-                      type="button"
-                      onClick={() => handleSelectPreset(preset)}
-                      className={`rounded-lg border border-dashed px-2 py-1.5 text-center text-[11px] font-semibold uppercase tracking-[0.25em] transition-colors ${isSelected
-                        ? "border-sky-400 bg-sky-500/20 text-sky-700 dark:text-sky-100"
-                        : "border-slate-300 bg-white text-slate-600 hover:border-slate-400 hover:text-slate-800 dark:border-slate-700 dark:bg-slate-950/70 dark:text-slate-300 dark:hover:border-slate-500 dark:hover:text-slate-100"
-                        }`}
-                    >
-                      <span className="line-clamp-2">{preset.name}</span>
-                    </button>
-                  );
-                })}
-              </div>
-            ) : (
-              <div className="rounded-lg border border-dashed border-slate-300 bg-slate-100 p-3 text-center text-[11px] text-slate-600 dark:border-slate-800 dark:bg-slate-950/50 dark:text-slate-400">
-                Drop audio files into <code className="font-mono text-slate-500 dark:text-slate-300">public/music-presets</code> to add presets.
+                    const audioObj = new Audio(src);
+                    audioObj.onloadedmetadata = () => {
+                      setAudio({ ...audioPayload, duration: audioObj.duration });
+                    };
+                    setAudio(audioPayload);
+                  }}
+                  className="hidden"
+                />
+              </label>
+            </div>
+
+            {audio && (
+              <div className="flex items-center justify-between rounded-md border bg-card p-2 text-xs">
+                <div className="flex items-center gap-2 overflow-hidden">
+                  <Music className="h-3.5 w-3.5 shrink-0 text-primary" />
+                  <span className="truncate">{audio.name}</span>
+                </div>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="h-6 w-6 shrink-0"
+                  onClick={clearAudioSelection}
+                >
+                  <X className="h-3 w-3" />
+                </Button>
               </div>
             )}
-            {presetError ? (
-              <p className="text-[11px] text-rose-600 dark:text-rose-400">{presetError}</p>
-            ) : null}
+
+            <div className="space-y-2 pt-2">
+              <span className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
+                Presets
+              </span>
+              {isLoadingPresets ? (
+                <div className="flex items-center justify-center py-4 text-muted-foreground">
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                </div>
+              ) : musicPresets.length > 0 ? (
+                <div className="grid grid-cols-2 gap-2">
+                  {musicPresets.map((preset) => {
+                    const isSelected = audio?.origin === "preset" && audio?.id === `preset-${preset.id}`;
+                    return (
+                      <button
+                        key={preset.id}
+                        type="button"
+                        onClick={() => handleSelectPreset(preset)}
+                        className={cn(
+                          "flex items-center gap-2 rounded-md border p-2 text-left text-xs transition-all",
+                          isSelected
+                            ? "border-primary bg-primary/5 text-primary"
+                            : "bg-background hover:bg-muted"
+                        )}
+                      >
+                        <Music className="h-3 w-3 shrink-0 opacity-50" />
+                        <span className="line-clamp-1">{preset.name}</span>
+                      </button>
+                    );
+                  })}
+                </div>
+              ) : (
+                <div className="rounded-md border border-dashed p-3 text-center text-[10px] text-muted-foreground">
+                  No presets found in public/music-presets
+                </div>
+              )}
+              {presetError && (
+                <p className="text-[10px] text-destructive">{presetError}</p>
+              )}
+            </div>
           </div>
 
-          {audio ? (
-            <div className="mt-2 flex items-center justify-between gap-2 rounded-lg border border-slate-300 bg-slate-100 px-3 py-2 text-xs text-slate-600 transition-colors dark:border-slate-800 dark:bg-slate-950/60 dark:text-slate-200">
-              <span className="truncate">
-                {audio.origin === "preset" ? `Preset: ${audio.name}` : `Uploaded: ${audio.name}`}
-              </span>
-              <button
-                type="button"
-                onClick={clearAudioSelection}
-                className="shrink-0 rounded-full border border-slate-300 px-2 py-1 text-[10px] font-semibold uppercase tracking-[0.25em] text-slate-600 transition hover:border-slate-400 hover:text-slate-800 dark:border-slate-700 dark:text-slate-300 dark:hover:border-slate-500 dark:hover:text-white"
-              >
-                Remove
-              </button>
-            </div>
-          ) : (
-            <p className="text-[11px] text-slate-500 dark:text-slate-400">No music selected.</p>
-          )}
-
-          <label className="flex items-center gap-2">
-            <input
-              type="checkbox"
+          <div className="flex items-center gap-2 pt-1">
+            <Checkbox
+              id="loop-audio"
               checked={audioLoop}
-              onChange={(e) => setAudioLoop(e.target.checked)}
-              className="h-3 w-3 rounded border-slate-300 text-sky-500 focus:ring-sky-500 dark:border-slate-700 dark:bg-slate-950/60"
+              onCheckedChange={(checked) => setAudioLoop(checked as boolean)}
             />
-            <span className="text-[11px] font-semibold uppercase tracking-[0.25em] text-slate-600 dark:text-slate-400">
+            <label
+              htmlFor="loop-audio"
+              className="text-xs font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
+            >
               Loop audio
-            </span>
-          </label>
+            </label>
+          </div>
         </div>
 
-        <label className="flex flex-col gap-2">
-          <span className="text-[11px] font-semibold uppercase tracking-[0.25em] text-slate-600 dark:text-slate-400">
+        <div className="space-y-2">
+          <span className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
             Format
           </span>
-          <select
+          <Select
             value={format}
-            onChange={(event) => setExportFormat(event.target.value as typeof format)}
-            className="rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm text-slate-700 focus:border-sky-400 focus:outline-none dark:border-slate-700 dark:bg-slate-950/60 dark:text-slate-100"
+            onValueChange={(val) => setExportFormat(val as typeof format)}
           >
-            <option value="mp4">MP4 (sequential cuts)</option>
-            <option value="png">PNG (coming soon)</option>
-            <option value="jpeg">JPEG (coming soon)</option>
-            <option value="webp">WebP (coming soon)</option>
-          </select>
-        </label>
+            <SelectTrigger>
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="mp4">MP4 (sequential cuts)</SelectItem>
+              <SelectItem value="png" disabled>PNG (coming soon)</SelectItem>
+              <SelectItem value="jpeg" disabled>JPEG (coming soon)</SelectItem>
+              <SelectItem value="webp" disabled>WebP (coming soon)</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
 
-        <label className="flex flex-col gap-2">
-          <span className="text-[11px] font-semibold uppercase tracking-[0.25em] text-slate-600 dark:text-slate-400">
-            Video length
-          </span>
-          <input
-            type="range"
+        <div className="space-y-3">
+          <div className="flex items-center justify-between">
+            <span className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
+              Duration
+            </span>
+            <span className="text-xs text-muted-foreground">{durationSeconds}s</span>
+          </div>
+          <Slider
             min={3}
             max={60}
             step={1}
-            value={durationSeconds}
-            onChange={(event) => setAnimationDuration(Number(event.target.value) * 1000)}
-            className="accent-sky-500"
+            value={[durationSeconds]}
+            onValueChange={([val]) => setAnimationDuration(val * 1000)}
           />
-          <span className="text-xs text-slate-600 dark:text-slate-300">{durationSeconds} second{durationSeconds === 1 ? "" : "s"}</span>
-        </label>
+        </div>
 
-        <button
-          type="button"
+        <Button
+          className="w-full"
           onClick={() => void handleExport()}
-          className="inline-flex items-center justify-center rounded-full bg-sky-500/15 px-4 py-2 text-[11px] font-semibold uppercase tracking-[0.3em] text-sky-700 shadow-inner shadow-sky-500/20 transition hover:bg-sky-500/25 disabled:cursor-not-allowed disabled:opacity-60 dark:bg-sky-500/10 dark:text-sky-100 dark:hover:bg-sky-500/20"
           disabled={isExporting || exportBlocked}
         >
-          {isExporting ? "Exporting…" : "Export preview"}
-        </button>
+          {isExporting ? (
+            <>
+              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+              Exporting...
+            </>
+          ) : (
+            "Export Video"
+          )}
+        </Button>
 
         {/* Progress Bar */}
         {isExporting && (
-          <div className="flex flex-col gap-1">
-            <div className="flex justify-between text-[10px] uppercase tracking-wider text-slate-500 dark:text-slate-400">
-              <span>{currentStep === "uploading" ? "Uploading assets" : currentStep === "rendering" ? "Rendering video" : "Processing"}</span>
+          <div className="space-y-2">
+            <div className="flex justify-between text-[10px] uppercase tracking-wider text-muted-foreground">
+              <span>{currentStep === "uploading" ? "Uploading assets" : currentStep === "rendering" ? "Rendering" : "Processing"}</span>
               <span>{currentStep === "uploading" ? `${uploadProgress}%` : `${renderProgress}%`}</span>
             </div>
-            <div className="h-1.5 w-full overflow-hidden rounded-full bg-slate-200 dark:bg-slate-800">
-              <div
-                className="h-full bg-sky-500 transition-all duration-300 ease-out"
-                style={{ width: `${currentStep === "uploading" ? uploadProgress : renderProgress}%` }}
-              />
-            </div>
+            <Progress value={currentStep === "uploading" ? uploadProgress : renderProgress} />
           </div>
         )}
 
-        {exportBlocked ? (
-          <p className="rounded-xl border border-dashed border-amber-500/40 bg-amber-500/10 p-3 text-[11px] text-amber-600 dark:text-amber-200">
-            Add matching top and bottom photos for every pair to enable exporting.
+        {exportBlocked && (
+          <p className="text-[10px] text-amber-600 dark:text-amber-400">
+            * Add matching top and bottom photos for every pair to enable exporting.
           </p>
-        ) : (
-          <p className="text-[11px] text-slate-600 dark:text-slate-400">{completePairCount} photo pair{completePairCount === 1 ? "" : "s"} will render sequentially.</p>
         )}
 
-        {status ? (
-          <p className="rounded-xl border border-dashed border-slate-300 bg-slate-100 p-3 text-xs text-slate-700 dark:border-slate-800 dark:bg-slate-950/40 dark:text-slate-300">
+        {status && !isExporting && (
+          <div className="rounded-md bg-muted p-2 text-xs text-muted-foreground">
             {status}
-          </p>
-        ) : null}
-      </div>
-    </section >
+          </div>
+        )}
+      </CardContent>
+    </Card>
   );
 }

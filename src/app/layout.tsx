@@ -16,8 +16,11 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Video Editor",
+  title: "RankingLab Tools",
   description: "Create stunning videos with ease",
+  icons: {
+    icon: "/capabala-logo.png",
+  },
 };
 
 export default function RootLayout({

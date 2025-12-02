@@ -6,11 +6,14 @@ import { useAppStore } from "../state/store";
 import type { UploadedImage } from "../state/types";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "./ui/card";
 import { Button } from "./ui/button";
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "./ui/dialog";
+import { ScrollArea } from "./ui/scroll-area";
 import { cn } from "@/lib/utils";
+import { ImagePlus, Trash2, X, RotateCw, Spline } from "lucide-react";
 
 const ACCEPTED_TYPES = ["image/jpeg", "image/png", "image/webp", "image/avif", "image/gif"];
 const MAX_PAIRS = 4;
-const PREVIEW_SIZE_CLASS = "h-32"; // consistent drop zone height to avoid scrolling
+const PREVIEW_SIZE_CLASS = "h-32";
 
 type SlotKind = "top" | "bottom";
 
@@ -40,19 +43,25 @@ const buildUploadedImage = async (file: File): Promise<UploadedImage> => {
   };
 };
 
-const imagePreview = (image?: UploadedImage) => {
+const ImagePreview = ({ image }: { image?: UploadedImage }) => {
   if (!image) {
     return (
       <div
-        className={`flex w-full flex-col items-center justify-center gap-1 rounded-lg border border-dashed border-slate-300/80 bg-slate-100 text-xs font-medium text-slate-500 transition-colors dark:border-slate-800/80 dark:bg-slate-950/70 dark:text-slate-400 ${PREVIEW_SIZE_CLASS}`}
+        className={cn(
+          "flex w-full flex-col items-center justify-center gap-2 rounded-lg border border-dashed border-muted-foreground/25 bg-muted/50 text-xs font-medium text-muted-foreground transition-colors hover:bg-muted",
+          PREVIEW_SIZE_CLASS
+        )}
       >
-        <span>Drop image</span>
-        <span className="text-[10px] uppercase tracking-[0.3em] text-slate-500 dark:text-slate-400">or browse</span>
+        <ImagePlus className="h-5 w-5 opacity-50" />
+        <div className="flex flex-col items-center gap-0.5">
+          <span>Drop image</span>
+          <span className="text-[10px] uppercase tracking-wider opacity-70">or browse</span>
+        </div>
       </div>
     );
   }
 
-  return <img src={image.src} alt={image.alt} className={`${PREVIEW_SIZE_CLASS} w-full rounded-lg object-cover`} />;
+  return <img src={image.src} alt={image.alt} className={cn(PREVIEW_SIZE_CLASS, "w-full rounded-lg object-cover")} />;
 };
 
 export function MediaPanel() {
@@ -152,6 +161,8 @@ export function MediaPanel() {
   // Handle paste events
   useEffect(() => {
     const handlePaste = async (event: ClipboardEvent) => {
+      if (!isModalOpen) return;
+
       const items = Array.from(event.clipboardData?.items ?? []);
       const imageFiles = items
         .filter((item) => item.type.startsWith("image/"))
@@ -184,7 +195,6 @@ export function MediaPanel() {
         }
       }
 
-      // If no empty slot found in existing pairs, start at the next new pair
       if (!foundEmpty) {
         startPairIndex = currentPairs.length;
         startSlot = "top";
@@ -195,196 +205,7 @@ export function MediaPanel() {
 
     window.addEventListener("paste", handlePaste);
     return () => window.removeEventListener("paste", handlePaste);
-  }, [assignImages]);
-
-  const mediaModal = !isModalOpen
-    ? null
-    : (
-      <div
-        className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 px-4 py-6 backdrop-blur-sm transition-colors dark:bg-slate-950/80"
-        role="dialog"
-        aria-modal="true"
-        onClick={() => setIsModalOpen(false)}
-      >
-        <div
-          className="relative w-full max-w-3xl overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-2xl shadow-slate-200/50 transition-colors dark:border-slate-800 dark:bg-slate-900 dark:shadow-slate-950/40"
-          onClick={(event) => event.stopPropagation()}
-        >
-          <div className="px-5 py-5 sm:px-6">
-            <div className="mb-5 flex flex-wrap items-start justify-between gap-3">
-              <div className="flex flex-col gap-1 pr-4">
-                <h3 className="text-sm font-semibold uppercase tracking-[0.2em] text-slate-900 dark:text-slate-200">Media uploader</h3>
-                <p className="text-xs text-slate-600 dark:text-slate-400">
-                  Drag and drop images into each slot or browse from your computer. You can add up to four photo pairs.
-                </p>
-              </div>
-              <button
-                type="button"
-                onClick={() => setIsModalOpen(false)}
-                className="shrink-0 rounded-full border border-slate-300 px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.25em] text-slate-600 transition hover:border-slate-400 hover:text-slate-800 dark:border-slate-700 dark:text-slate-300 dark:hover:border-slate-500 dark:hover:text-white"
-              >
-                Close
-              </button>
-            </div>
-
-            <div className="space-y-4">
-              <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-                {displayPairs.map((pair, index) => {
-                  const topImage = pair.top;
-                  const bottomImage = pair.bottom;
-                  const isActive = activePairIndex === index;
-                  return (
-                    <div
-                      key={pair.id}
-                      className={`flex flex-col gap-2.5 rounded-2xl border border-slate-200 bg-slate-50 p-3 transition-colors dark:border-slate-800 dark:bg-slate-950/50 ${isActive ? "border-sky-400 shadow-inner shadow-sky-500/20" : ""
-                        }`}
-                    >
-                      <div className="flex flex-col gap-1">
-                        <span className="text-[9px] font-semibold uppercase tracking-[0.25em] text-slate-500 dark:text-slate-400">
-                          Photo 1 drag or upload photo
-                        </span>
-                        <label
-                          onDrop={(event) => void handleDrop(event, index, "top")}
-                          onDragOver={(event) => handleDragOver(event, index, "top")}
-                          onDragLeave={handleDragLeave}
-                          className={`group relative flex aspect-square w-full cursor-pointer items-center justify-center overflow-hidden rounded-xl border border-dashed border-slate-300 bg-white text-center transition-colors dark:border-slate-700 dark:bg-slate-950/70 ${dragTarget?.pairIndex === index && dragTarget.slot === "top"
-                            ? "border-sky-400 text-sky-700 dark:text-sky-200"
-                            : "hover:border-slate-400 hover:text-slate-700 dark:hover:border-slate-500 dark:hover:text-slate-200"
-                            }`}
-                        >
-                          <input
-                            type="file"
-                            accept={ACCEPTED_TYPES.join(",")}
-                            multiple
-                            className="hidden"
-                            onChange={(event) => void handleFileInput(event, index, "top")}
-                          />
-                          {imagePreview(topImage)}
-                          {topImage ? (
-                            <button
-                              type="button"
-                              onClick={(event) => handleRemoveImage(event, index, "top")}
-                              className="absolute right-2 top-2 rounded-full bg-slate-200 px-2 py-1 text-[10px] font-semibold uppercase tracking-[0.25em] text-slate-700 transition hover:bg-slate-300 dark:bg-slate-900/80 dark:text-slate-200 dark:hover:bg-slate-800"
-                            >
-                              Remove
-                            </button>
-                          ) : null}
-                        </label>
-                      </div>
-
-                      <div className="flex flex-col gap-1">
-                        <span className="text-[9px] font-semibold uppercase tracking-[0.25em] text-slate-500 dark:text-slate-400">
-                          Photo 2 drag or upload photo
-                        </span>
-                        <label
-                          onDrop={(event) => void handleDrop(event, index, "bottom")}
-                          onDragOver={(event) => handleDragOver(event, index, "bottom")}
-                          onDragLeave={handleDragLeave}
-                          className={`group relative flex aspect-square w-full cursor-pointer items-center justify-center overflow-hidden rounded-xl border border-dashed border-slate-300 bg-white text-center transition-colors dark:border-slate-700 dark:bg-slate-950/70 ${dragTarget?.pairIndex === index && dragTarget.slot === "bottom"
-                            ? "border-sky-400 text-sky-700 dark:text-sky-200"
-                            : "hover:border-slate-400 hover:text-slate-700 dark:hover:border-slate-500 dark:hover:text-slate-200"
-                            }`}
-                        >
-                          <input
-                            type="file"
-                            accept={ACCEPTED_TYPES.join(",")}
-                            multiple
-                            className="hidden"
-                            onChange={(event) => void handleFileInput(event, index, "bottom")}
-                          />
-                          {imagePreview(bottomImage)}
-                          {bottomImage ? (
-                            <button
-                              type="button"
-                              onClick={(event) => handleRemoveImage(event, index, "bottom")}
-                              className="absolute right-2 top-2 rounded-full bg-slate-200 px-2 py-1 text-[10px] font-semibold uppercase tracking-[0.25em] text-slate-700 transition hover:bg-slate-300 dark:bg-slate-900/80 dark:text-slate-200 dark:hover:bg-slate-800"
-                            >
-                              Remove
-                            </button>
-                          ) : null}
-                        </label>
-                      </div>
-
-                      <div className="flex flex-wrap items-center justify-between gap-2">
-                        <button
-                          type="button"
-                          onClick={() => setActivePairIndex(index)}
-                          className={`rounded-full px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.25em] transition ${isActive
-                            ? "bg-sky-500/30 text-sky-100"
-                            : "bg-slate-800 text-slate-300 hover:bg-slate-700"
-                            }`}
-                        >
-                          Preview pair
-                        </button>
-                        {photoPairs.length > 1 ? (
-                          <button
-                            type="button"
-                            onClick={() => removePhotoPair(index)}
-                            className="rounded-full border border-slate-300 px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.25em] text-slate-600 transition hover:border-slate-400 hover:text-slate-800 dark:border-slate-700 dark:text-slate-400 dark:hover:border-slate-500 dark:hover:text-slate-200"
-                          >
-                            Remove pair
-                          </button>
-                        ) : null}
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-
-
-              <div className="flex flex-wrap items-center justify-between gap-3">
-                <div className="flex flex-wrap gap-2">
-                  {displayPairs.map((pair, index) => (
-                    <div
-                      key={`${pair.id}-chip`}
-                      className={`flex items-center gap-1 rounded-full border px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.25em] ${activePairIndex === index
-                        ? "border-sky-400 bg-sky-500/20 text-sky-700 dark:text-sky-100"
-                        : "border-slate-300 bg-slate-200 text-slate-700 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-300"
-                        }`}
-                    >
-                      <button
-                        type="button"
-                        onClick={() => setActivePairIndex(index)}
-                        className="transition hover:text-slate-900 dark:hover:text-white"
-                      >
-                        Pair {index + 1}
-                      </button>
-                      {photoPairs.length > 1 ? (
-                        <button
-                          type="button"
-                          onClick={() => removePhotoPair(index)}
-                          className="text-slate-500 transition hover:text-rose-500 dark:text-slate-400 dark:hover:text-rose-300"
-                          aria-label={`Remove pair ${index + 1}`}
-                        >
-                          ×
-                        </button>
-                      ) : null}
-                    </div>
-                  ))}
-                </div>
-                <div className="flex items-center gap-2">
-                  <button
-                    type="button"
-                    onClick={addPhotoPair}
-                    disabled={!canAddPair}
-                    className="rounded-full border border-slate-300 px-4 py-2 text-[11px] font-semibold uppercase tracking-[0.3em] text-slate-600 transition hover:border-slate-400 hover:text-slate-900 disabled:cursor-not-allowed disabled:opacity-50 dark:border-slate-700 dark:text-slate-200 dark:hover:border-slate-500 dark:hover:text-white"
-                  >
-                    {canAddPair ? "Add photo pair" : "Max pairs reached"}
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setIsModalOpen(false)}
-                    className="rounded-full bg-sky-500/15 px-4 py-2 text-[11px] font-semibold uppercase tracking-[0.3em] text-sky-700 transition hover:bg-sky-500/25 dark:bg-sky-500/20 dark:text-sky-100 dark:hover:bg-sky-500/30"
-                  >
-                    Done
-                  </button>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
-    );
+  }, [assignImages, isModalOpen]);
 
   return (
     <Card>
@@ -392,121 +213,263 @@ export function MediaPanel() {
         <div className="flex items-center justify-between">
           <CardTitle className="text-sm font-medium uppercase tracking-wider text-muted-foreground">Media</CardTitle>
           <div className="flex items-center gap-2">
-            <Button
-              variant="secondary"
-              size="sm"
-              onClick={() => setIsModalOpen(true)}
-              className="h-6 px-2 text-xs uppercase tracking-wider"
-            >
-              Manage uploads
-            </Button>
+            <Dialog open={isModalOpen} onOpenChange={setIsModalOpen}>
+              <DialogTrigger asChild>
+                <Button
+                  variant="secondary"
+                  size="sm"
+                  className="h-7 px-2 text-xs uppercase tracking-wider"
+                >
+                  Manage
+                </Button>
+              </DialogTrigger>
+              <DialogContent className="max-w-4xl">
+                <DialogHeader>
+                  <DialogTitle>Media Library</DialogTitle>
+                  <DialogDescription>
+                    Drag and drop images into slots or click to browse. Up to {MAX_PAIRS} pairs supported.
+                  </DialogDescription>
+                </DialogHeader>
+
+                <ScrollArea className="max-h-[60vh] pr-4">
+                  <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+                    {displayPairs.map((pair, index) => {
+                      const isActive = activePairIndex === index;
+                      return (
+                        <div
+                          key={pair.id}
+                          className={cn(
+                            "flex flex-col gap-3 rounded-xl border bg-card p-3 transition-colors",
+                            isActive ? "border-primary ring-1 ring-primary/20" : "border-border"
+                          )}
+                        >
+                          <div className="flex items-center justify-between">
+                            <span className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
+                              Pair {index + 1}
+                            </span>
+                            <div className="flex items-center gap-1">
+                              <Button
+                                variant={isActive ? "default" : "ghost"}
+                                size="icon"
+                                className="h-6 w-6"
+                                onClick={() => setActivePairIndex(index)}
+                                title="Preview this pair"
+                              >
+                                <Spline className="h-3 w-3" />
+                              </Button>
+                              {photoPairs.length > 1 && (
+                                <Button
+                                  variant="ghost"
+                                  size="icon"
+                                  className="h-6 w-6 text-muted-foreground hover:text-destructive"
+                                  onClick={() => removePhotoPair(index)}
+                                  title="Remove pair"
+                                >
+                                  <Trash2 className="h-3 w-3" />
+                                </Button>
+                              )}
+                            </div>
+                          </div>
+
+                          <div className="space-y-2">
+                            {/* Top Image */}
+                            <div className="space-y-1">
+                              <span className="text-[9px] font-semibold uppercase tracking-wider text-muted-foreground/70">
+                                Photo 1
+                              </span>
+                              <label
+                                onDrop={(event) => void handleDrop(event, index, "top")}
+                                onDragOver={(event) => handleDragOver(event, index, "top")}
+                                onDragLeave={handleDragLeave}
+                                className={cn(
+                                  "group relative flex aspect-square w-full cursor-pointer items-center justify-center overflow-hidden rounded-lg border-2 border-dashed transition-colors",
+                                  dragTarget?.pairIndex === index && dragTarget.slot === "top"
+                                    ? "border-primary bg-primary/5"
+                                    : "border-transparent hover:border-muted-foreground/25"
+                                )}
+                              >
+                                <input
+                                  type="file"
+                                  accept={ACCEPTED_TYPES.join(",")}
+                                  multiple
+                                  className="hidden"
+                                  onChange={(event) => void handleFileInput(event, index, "top")}
+                                />
+                                <ImagePreview image={pair.top} />
+                                {pair.top && (
+                                  <Button
+                                    variant="secondary"
+                                    size="icon"
+                                    className="absolute right-2 top-2 h-6 w-6 rounded-full opacity-0 transition-opacity group-hover:opacity-100"
+                                    onClick={(event) => handleRemoveImage(event, index, "top")}
+                                  >
+                                    <X className="h-3 w-3" />
+                                  </Button>
+                                )}
+                              </label>
+                            </div>
+
+                            {/* Bottom Image */}
+                            <div className="space-y-1">
+                              <span className="text-[9px] font-semibold uppercase tracking-wider text-muted-foreground/70">
+                                Photo 2
+                              </span>
+                              <label
+                                onDrop={(event) => void handleDrop(event, index, "bottom")}
+                                onDragOver={(event) => handleDragOver(event, index, "bottom")}
+                                onDragLeave={handleDragLeave}
+                                className={cn(
+                                  "group relative flex aspect-square w-full cursor-pointer items-center justify-center overflow-hidden rounded-lg border-2 border-dashed transition-colors",
+                                  dragTarget?.pairIndex === index && dragTarget.slot === "bottom"
+                                    ? "border-primary bg-primary/5"
+                                    : "border-transparent hover:border-muted-foreground/25"
+                                )}
+                              >
+                                <input
+                                  type="file"
+                                  accept={ACCEPTED_TYPES.join(",")}
+                                  multiple
+                                  className="hidden"
+                                  onChange={(event) => void handleFileInput(event, index, "bottom")}
+                                />
+                                <ImagePreview image={pair.bottom} />
+                                {pair.bottom && (
+                                  <Button
+                                    variant="secondary"
+                                    size="icon"
+                                    className="absolute right-2 top-2 h-6 w-6 rounded-full opacity-0 transition-opacity group-hover:opacity-100"
+                                    onClick={(event) => handleRemoveImage(event, index, "bottom")}
+                                  >
+                                    <X className="h-3 w-3" />
+                                  </Button>
+                                )}
+                              </label>
+                            </div>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </ScrollArea>
+
+                <div className="flex items-center justify-between border-t pt-4">
+                  <div className="flex items-center gap-2">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={addPhotoPair}
+                      disabled={!canAddPair}
+                      className="gap-2"
+                    >
+                      <ImagePlus className="h-4 w-4" />
+                      Add Pair
+                    </Button>
+                    <span className="text-xs text-muted-foreground">
+                      {photoPairs.length}/{MAX_PAIRS} pairs
+                    </span>
+                  </div>
+                  <Button onClick={() => setIsModalOpen(false)}>Done</Button>
+                </div>
+              </DialogContent>
+            </Dialog>
+
             <Button
               variant="ghost"
               size="sm"
               onClick={clearImages}
-              className="h-6 px-2 text-xs uppercase tracking-wider"
+              className="h-7 px-2 text-xs uppercase tracking-wider text-muted-foreground hover:text-destructive"
             >
               Clear
             </Button>
           </div>
         </div>
-        <CardDescription className="text-xs">Upload photo pairs.</CardDescription>
+        <CardDescription className="text-xs">Upload and manage photo pairs.</CardDescription>
       </CardHeader>
 
       <CardContent className="space-y-4">
-        <div className="rounded-lg border bg-card p-3">
-          <div className="mb-2 flex items-center gap-2 text-[11px] text-muted-foreground">
-            <span>{readyPairCount}/{photoPairs.length} ready</span>
-            <span className="text-muted-foreground/50">•</span>
-            <span>Pair {activePairNumber}</span>
+        <div className="rounded-lg border bg-muted/30 p-3">
+          <div className="mb-3 flex items-center justify-between text-[11px] text-muted-foreground">
+            <div className="flex items-center gap-2">
+              <span className="font-medium text-foreground">{readyPairCount}/{photoPairs.length}</span>
+              <span>ready</span>
+            </div>
+            <span>Current: Pair {activePairNumber}</span>
           </div>
+
           <div className="flex flex-wrap gap-2">
             {photoPairs.map((pair, index) => {
               const isActive = activePairIndex === index;
               const isComplete = Boolean(pair.top && pair.bottom);
               return (
-                <div
+                <button
                   key={pair.id}
+                  onClick={() => setActivePairIndex(index)}
                   className={cn(
-                    "flex items-center gap-2 rounded-full border px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.25em]",
+                    "group flex items-center gap-2 rounded-full border px-3 py-1.5 text-[11px] font-semibold uppercase tracking-wider transition-all",
                     isActive
                       ? "border-primary bg-primary/10 text-primary"
-                      : "border-border bg-muted text-muted-foreground"
+                      : "border-transparent bg-background text-muted-foreground hover:border-border hover:text-foreground"
                   )}
                 >
-                  <button
-                    type="button"
-                    onClick={() => setActivePairIndex(index)}
+                  <span>{index + 1}</span>
+                  <span
                     className={cn(
-                      "flex items-center gap-2 transition",
-                      !isActive && "hover:text-foreground"
+                      "h-1.5 w-1.5 rounded-full",
+                      isComplete ? "bg-emerald-500" : "bg-amber-500"
                     )}
-                  >
-                    Pair {index + 1}
-                    <span
-                      className={cn(
-                        "h-2 w-2 rounded-full",
-                        isComplete ? "bg-emerald-400" : "bg-amber-400"
-                      )}
-                      aria-hidden="true"
-                    />
-                  </button>
-                  {photoPairs.length > 1 ? (
-                    <button
-                      type="button"
-                      onClick={() => removePhotoPair(index)}
-                      className="text-muted-foreground transition hover:text-destructive"
-                      aria-label={`Remove pair ${index + 1}`}
-                    >
-                      ×
-                    </button>
-                  ) : null}
-                </div>
+                  />
+                </button>
               );
             })}
           </div>
+
           {hasIncompletePair ? (
-            <p className="mt-3 text-[11px] text-amber-600 dark:text-amber-400">
-              Add both top and bottom photos for every pair to enable seamless cuts.
+            <p className="mt-3 flex items-center gap-2 text-[11px] text-amber-600 dark:text-amber-400">
+              <span className="h-1.5 w-1.5 rounded-full bg-amber-500" />
+              Incomplete pairs will be skipped.
             </p>
           ) : (
-            <p className="mt-3 text-[11px] text-muted-foreground">Ready pairs will render sequentially in the export.</p>
+            <p className="mt-3 text-[11px] text-muted-foreground">All pairs ready for export.</p>
           )}
         </div>
 
-
-        {mediaModal}
-
-        <div className="mt-5 flex flex-col gap-3 rounded-lg border bg-card p-4">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Orientation</p>
-              <p className="text-[11px] text-muted-foreground">
-                {compare.orientation === "vertical" ? "Vertical (left vs right)" : "Horizontal (top vs bottom)"}
-              </p>
+        <div className="grid grid-cols-2 gap-3">
+          <div className="flex flex-col gap-2 rounded-lg border bg-card p-3">
+            <div className="flex items-center justify-between">
+              <span className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
+                Orientation
+              </span>
+              <Button
+                variant="ghost"
+                size="icon"
+                className="h-6 w-6"
+                onClick={() => setOrientation(compare.orientation === "vertical" ? "horizontal" : "vertical")}
+              >
+                <RotateCw className="h-3 w-3" />
+              </Button>
             </div>
-            <Button
-              variant="secondary"
-              size="sm"
-              onClick={() => setOrientation(compare.orientation === "vertical" ? "horizontal" : "vertical")}
-              className="text-xs uppercase tracking-wider"
-            >
-              Flip
-            </Button>
+            <p className="text-xs font-medium">
+              {compare.orientation === "vertical" ? "Vertical" : "Horizontal"}
+            </p>
           </div>
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Divider</p>
-              <p className="text-[11px] text-muted-foreground">Show reference line over the slider.</p>
+
+          <div className="flex flex-col gap-2 rounded-lg border bg-card p-3">
+            <div className="flex items-center justify-between">
+              <span className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
+                Divider
+              </span>
+              <Button
+                variant={compare.showDivider ? "default" : "secondary"}
+                size="sm"
+                className="h-6 px-2 text-[10px] uppercase tracking-wider"
+                onClick={toggleDivider}
+              >
+                {compare.showDivider ? "On" : "Off"}
+              </Button>
             </div>
-            <Button
-              variant={compare.showDivider ? "default" : "secondary"}
-              size="sm"
-              onClick={toggleDivider}
-              className="text-xs uppercase tracking-wider"
-            >
-              {compare.showDivider ? "On" : "Off"}
-            </Button>
+            <p className="text-xs text-muted-foreground">
+              {compare.showDivider ? "Visible" : "Hidden"}
+            </p>
           </div>
         </div>
       </CardContent>
