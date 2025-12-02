@@ -840,10 +840,12 @@ export default function SlideshowPage() {
                         <div className="flex-1 bg-muted/10 p-8 flex items-center justify-center">
                             <div
                                 className={cn(
-                                    "w-full max-w-5xl overflow-hidden rounded-lg border bg-background shadow-sm transition-all duration-300",
-                                    aspectRatio === "9:16" ? "aspect-[9/16] h-[80vh] w-auto" : "aspect-video"
-                                )}
-                            >
+                                    "overflow-hidden rounded-lg border bg-background shadow-sm transition-all duration-300",
+                                    aspectRatio === "9:16"
+                                        ? "aspect-[9/16] h-full max-h-[80vh] w-auto"
+                                        : "aspect-video w-full max-w-5xl"
+                                )
+                                }>
                                 <Player
                                     component={SlideshowComposition}
                                     inputProps={{
