@@ -838,7 +838,12 @@ export default function SlideshowPage() {
                 <ResizablePanel defaultSize={75}>
                     <div className="flex h-full flex-col overflow-hidden bg-background">
                         <div className="flex-1 bg-muted/10 p-8 flex items-center justify-center">
-                            <div className="aspect-video w-full max-w-5xl overflow-hidden rounded-lg border bg-background shadow-sm">
+                            <div
+                                className={cn(
+                                    "w-full max-w-5xl overflow-hidden rounded-lg border bg-background shadow-sm transition-all duration-300",
+                                    aspectRatio === "9:16" ? "aspect-[9/16] max-h-[80vh] w-auto" : "aspect-video"
+                                )}
+                            >
                                 <Player
                                     component={SlideshowComposition}
                                     inputProps={{
@@ -848,8 +853,8 @@ export default function SlideshowPage() {
                                     }}
                                     durationInFrames={durationInFrames}
                                     fps={fps}
-                                    compositionWidth={1920}
-                                    compositionHeight={1080}
+                                    compositionWidth={aspectRatio === "9:16" ? 1080 : 1920}
+                                    compositionHeight={aspectRatio === "9:16" ? 1920 : 1080}
                                     style={{
                                         width: '100%',
                                         height: '100%',

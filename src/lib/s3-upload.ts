@@ -1,7 +1,7 @@
 import { S3Client, PutObjectCommand } from "@aws-sdk/client-s3";
 
 const s3Client = new S3Client({
-  region: process.env.REMOTION_AWS_REGION || "us-east-1",
+  region: process.env.REMOTION_AWS_REGION || "ap-southeast-1",
   credentials: {
     accessKeyId: process.env.REMOTION_AWS_ACCESS_KEY_ID || "",
     secretAccessKey: process.env.REMOTION_AWS_SECRET_ACCESS_KEY || "",
@@ -50,7 +50,7 @@ export async function uploadBase64ToS3(
   // If the Lambda is in the same region, it can read from S3 if permissions allow.
   // For simplicity, let's assume we return a signed URL or a public URL.
   // If ACL is public-read:
-  return `https://${bucketName}.s3.${process.env.REMOTION_AWS_REGION || "us-east-1"}.amazonaws.com/uploads/${filename}`;
+  return `https://${bucketName}.s3.${process.env.REMOTION_AWS_REGION || "ap-southeast-1"}.amazonaws.com/uploads/${filename}`;
 }
 
 export async function uploadBufferToS3(
@@ -71,7 +71,7 @@ export async function uploadBufferToS3(
     })
   );
 
-  return `https://${bucketName}.s3.${process.env.REMOTION_AWS_REGION || "us-east-1"}.amazonaws.com/uploads/${filename}`;
+  return `https://${bucketName}.s3.${process.env.REMOTION_AWS_REGION || "ap-southeast-1"}.amazonaws.com/uploads/${filename}`;
 }
 
 
@@ -95,7 +95,7 @@ export async function getPresignedUrl(
   });
 
   const uploadUrl = await getSignedUrl(s3Client, command, { expiresIn: 3600 });
-  const fileUrl = `https://${bucketName}.s3.${process.env.REMOTION_AWS_REGION || "us-east-1"}.amazonaws.com/${key}`;
+  const fileUrl = `https://${bucketName}.s3.${process.env.REMOTION_AWS_REGION || "ap-southeast-1"}.amazonaws.com/${key}`;
 
   return { uploadUrl, fileUrl };
 }

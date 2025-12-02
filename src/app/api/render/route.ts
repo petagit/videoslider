@@ -188,7 +188,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     // --- EXECUTE RENDER ---
 
     if (useLambda) {
-      const region = (process.env.REMOTION_AWS_REGION || "us-east-1") as AwsRegion;
+      const region = (process.env.REMOTION_AWS_REGION || "ap-southeast-1") as AwsRegion;
       const functionName = process.env.REMOTION_LAMBDA_FUNCTION_NAME!;
       const serveUrl = process.env.REMOTION_LAMBDA_SERVE_URL!;
 

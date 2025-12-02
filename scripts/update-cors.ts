@@ -4,7 +4,7 @@ import dotenv from "dotenv";
 dotenv.config();
 
 async function main() {
-    const region = process.env.REMOTION_AWS_REGION || "us-east-1";
+    const region = process.env.REMOTION_AWS_REGION || "ap-southeast-1";
     const bucketName = process.env.REMOTION_BUCKET;
 
     if (!bucketName) {

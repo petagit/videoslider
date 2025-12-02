@@ -76,7 +76,7 @@ async function ensureRole(region: string) {
 async function main() {
   console.log("🚀 Starting Remotion Lambda setup...");
 
-  const region = (process.env.REMOTION_AWS_REGION || "us-east-1") as AwsRegion;
+  const region = (process.env.REMOTION_AWS_REGION || "ap-southeast-1") as AwsRegion;
   console.log(`📍 Region: ${region}`);
 
   try {
