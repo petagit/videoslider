@@ -4,6 +4,9 @@
 import { ChangeEvent, DragEvent, MouseEvent, useCallback, useEffect, useMemo, useState } from "react";
 import { useAppStore } from "../state/store";
 import type { UploadedImage } from "../state/types";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "./ui/card";
+import { Button } from "./ui/button";
+import { cn } from "@/lib/utils";
 
 const ACCEPTED_TYPES = ["image/jpeg", "image/png", "image/webp", "image/avif", "image/gif"];
 const MAX_PAIRS = 4;
@@ -384,117 +387,129 @@ export function MediaPanel() {
     );
 
   return (
-    <section className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm transition-colors dark:border-slate-800 dark:bg-slate-900/60">
-      <header className="mb-3 flex flex-wrap items-center justify-between gap-2">
-        <div>
-          <h2 className="text-xs font-semibold uppercase tracking-[0.2em] text-slate-800 dark:text-slate-300">Media</h2>
-          <p className="text-[11px] text-slate-600 dark:text-slate-400">Upload photo pairs.</p>
+    <Card>
+      <CardHeader className="pb-3">
+        <div className="flex items-center justify-between">
+          <CardTitle className="text-sm font-medium uppercase tracking-wider text-muted-foreground">Media</CardTitle>
+          <div className="flex items-center gap-2">
+            <Button
+              variant="secondary"
+              size="sm"
+              onClick={() => setIsModalOpen(true)}
+              className="h-6 px-2 text-xs uppercase tracking-wider"
+            >
+              Manage uploads
+            </Button>
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={clearImages}
+              className="h-6 px-2 text-xs uppercase tracking-wider"
+            >
+              Clear
+            </Button>
+          </div>
         </div>
-        <div className="flex items-center gap-2">
-          <button
-            type="button"
-            onClick={() => setIsModalOpen(true)}
-            className="rounded-full bg-slate-200 px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.2em] text-slate-700 transition hover:bg-slate-300 dark:bg-slate-800 dark:text-slate-200 dark:hover:bg-slate-700"
-          >
-            Manage uploads
-          </button>
-          <button
-            type="button"
-            onClick={clearImages}
-            className="rounded-full border border-slate-300 px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.2em] text-slate-600 transition hover:border-slate-400 hover:text-slate-900 dark:border-slate-700 dark:text-slate-300 dark:hover:border-slate-500 dark:hover:text-white"
-          >
-            Clear
-          </button>
-        </div>
-      </header>
+        <CardDescription className="text-xs">Upload photo pairs.</CardDescription>
+      </CardHeader>
 
-      <div className="rounded-lg border border-slate-200 bg-slate-50 p-3 transition-colors dark:border-slate-800 dark:bg-slate-950/40">
-        <div className="mb-2 flex items-center gap-2 text-[11px] text-slate-600 dark:text-slate-300">
-          <span>{readyPairCount}/{photoPairs.length} ready</span>
-          <span className="text-slate-400">•</span>
-          <span>Pair {activePairNumber}</span>
-        </div>
-        <div className="flex flex-wrap gap-2">
-          {photoPairs.map((pair, index) => {
-            const isActive = activePairIndex === index;
-            const isComplete = Boolean(pair.top && pair.bottom);
-            return (
-              <div
-                key={pair.id}
-                className={`flex items-center gap-2 rounded-full border px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.25em] ${isActive
-                  ? "border-sky-400 bg-sky-500/20 text-sky-700 dark:text-sky-100"
-                  : "border-slate-300 bg-slate-200 text-slate-700 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-300"
-                  }`}
-              >
-                <button
-                  type="button"
-                  onClick={() => setActivePairIndex(index)}
-                  className={`flex items-center gap-2 transition ${isActive ? "" : "hover:text-slate-900 dark:hover:text-white"}`}
+      <CardContent className="space-y-4">
+        <div className="rounded-lg border bg-card p-3">
+          <div className="mb-2 flex items-center gap-2 text-[11px] text-muted-foreground">
+            <span>{readyPairCount}/{photoPairs.length} ready</span>
+            <span className="text-muted-foreground/50">•</span>
+            <span>Pair {activePairNumber}</span>
+          </div>
+          <div className="flex flex-wrap gap-2">
+            {photoPairs.map((pair, index) => {
+              const isActive = activePairIndex === index;
+              const isComplete = Boolean(pair.top && pair.bottom);
+              return (
+                <div
+                  key={pair.id}
+                  className={cn(
+                    "flex items-center gap-2 rounded-full border px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.25em]",
+                    isActive
+                      ? "border-primary bg-primary/10 text-primary"
+                      : "border-border bg-muted text-muted-foreground"
+                  )}
                 >
-                  Pair {index + 1}
-                  <span
-                    className={`h-2 w-2 rounded-full ${isComplete ? "bg-emerald-400" : "bg-amber-400"}`}
-                    aria-hidden="true"
-                  />
-                </button>
-                {photoPairs.length > 1 ? (
                   <button
                     type="button"
-                    onClick={() => removePhotoPair(index)}
-                    className="text-slate-500 transition hover:text-rose-500 dark:text-slate-400 dark:hover:text-rose-300"
-                    aria-label={`Remove pair ${index + 1}`}
+                    onClick={() => setActivePairIndex(index)}
+                    className={cn(
+                      "flex items-center gap-2 transition",
+                      !isActive && "hover:text-foreground"
+                    )}
                   >
-                    ×
+                    Pair {index + 1}
+                    <span
+                      className={cn(
+                        "h-2 w-2 rounded-full",
+                        isComplete ? "bg-emerald-400" : "bg-amber-400"
+                      )}
+                      aria-hidden="true"
+                    />
                   </button>
-                ) : null}
-              </div>
-            );
-          })}
-        </div>
-        {hasIncompletePair ? (
-          <p className="mt-3 text-[11px] text-amber-600 dark:text-amber-300">
-            Add both top and bottom photos for every pair to enable seamless cuts.
-          </p>
-        ) : (
-          <p className="mt-3 text-[11px] text-slate-600 dark:text-slate-400">Ready pairs will render sequentially in the export.</p>
-        )}
-      </div>
-
-      {mediaModal}
-
-      <div className="mt-5 flex flex-col gap-3 rounded-xl bg-slate-100 p-4 transition-colors dark:bg-slate-950/40">
-        <div className="flex items-center justify-between">
-          <div>
-            <p className="text-xs font-semibold uppercase tracking-[0.2em] text-slate-500 dark:text-slate-400">Orientation</p>
-            <p className="text-[11px] text-slate-600 dark:text-slate-400">
-              {compare.orientation === "vertical" ? "Vertical (left vs right)" : "Horizontal (top vs bottom)"}
+                  {photoPairs.length > 1 ? (
+                    <button
+                      type="button"
+                      onClick={() => removePhotoPair(index)}
+                      className="text-muted-foreground transition hover:text-destructive"
+                      aria-label={`Remove pair ${index + 1}`}
+                    >
+                      ×
+                    </button>
+                  ) : null}
+                </div>
+              );
+            })}
+          </div>
+          {hasIncompletePair ? (
+            <p className="mt-3 text-[11px] text-amber-600 dark:text-amber-400">
+              Add both top and bottom photos for every pair to enable seamless cuts.
             </p>
-          </div>
-          <button
-            type="button"
-            onClick={() => setOrientation(compare.orientation === "vertical" ? "horizontal" : "vertical")}
-            className="rounded-full bg-slate-200 px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.25em] text-slate-700 transition hover:bg-slate-300 dark:bg-slate-800 dark:text-slate-200 dark:hover:bg-slate-700"
-          >
-            Flip
-          </button>
+          ) : (
+            <p className="mt-3 text-[11px] text-muted-foreground">Ready pairs will render sequentially in the export.</p>
+          )}
         </div>
-        <div className="flex items-center justify-between">
-          <div>
-            <p className="text-xs font-semibold uppercase tracking-[0.2em] text-slate-500 dark:text-slate-400">Divider</p>
-            <p className="text-[11px] text-slate-600 dark:text-slate-400">Show reference line over the slider.</p>
+
+
+        {mediaModal}
+
+        <div className="mt-5 flex flex-col gap-3 rounded-lg border bg-card p-4">
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Orientation</p>
+              <p className="text-[11px] text-muted-foreground">
+                {compare.orientation === "vertical" ? "Vertical (left vs right)" : "Horizontal (top vs bottom)"}
+              </p>
+            </div>
+            <Button
+              variant="secondary"
+              size="sm"
+              onClick={() => setOrientation(compare.orientation === "vertical" ? "horizontal" : "vertical")}
+              className="text-xs uppercase tracking-wider"
+            >
+              Flip
+            </Button>
           </div>
-          <button
-            type="button"
-            onClick={toggleDivider}
-            className={`rounded-full px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.25em] transition ${compare.showDivider
-              ? "bg-sky-500/20 text-sky-700 hover:bg-sky-500/30 dark:text-sky-200"
-              : "bg-slate-200 text-slate-700 hover:bg-slate-300 dark:bg-slate-800 dark:text-slate-300 dark:hover:bg-slate-700"
-              }`}
-          >
-            {compare.showDivider ? "On" : "Off"}
-          </button>
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Divider</p>
+              <p className="text-[11px] text-muted-foreground">Show reference line over the slider.</p>
+            </div>
+            <Button
+              variant={compare.showDivider ? "default" : "secondary"}
+              size="sm"
+              onClick={toggleDivider}
+              className="text-xs uppercase tracking-wider"
+            >
+              {compare.showDivider ? "On" : "Off"}
+            </Button>
+          </div>
         </div>
-      </div>
-    </section>
+      </CardContent>
+    </Card>
   );
 }

@@ -5,9 +5,9 @@ import { PreviewStage } from "../components/preview-stage";
 
 export default function Home() {
   return (
-    <div className="flex h-full overflow-hidden text-slate-900 dark:text-slate-100">
+    <div className="flex h-full overflow-hidden bg-background text-foreground">
       <div className="flex flex-1 overflow-hidden">
-        <aside className="flex w-[260px] shrink-0 flex-col gap-4 overflow-y-auto border-r border-slate-200 bg-slate-50 p-4 dark:border-slate-800 dark:bg-slate-950 md:w-[280px] lg:w-[380px]">
+        <aside className="flex w-[320px] shrink-0 flex-col gap-6 overflow-y-auto border-r bg-muted/30 p-6">
           <div className="flex flex-col gap-4">
             <MediaPanel />
             <OverlayPanel />

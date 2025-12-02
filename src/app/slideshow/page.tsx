@@ -5,6 +5,25 @@ import { Player } from "@remotion/player";
 import { SlideshowComposition } from "../../../remotion/SlideshowComposition";
 import { toast } from "sonner";
 import { resizeImage } from "@/lib/image-processing";
+import { cn } from "@/lib/utils";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Slider } from "@/components/ui/slider";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Separator } from "@/components/ui/separator";
+import {
+    X,
+    Upload,
+    Music,
+    Download,
+    Play,
+    Pause,
+    Film,
+    Loader2,
+    Copy,
+    Check
+} from "lucide-react";
 
 interface MusicPreset {
     id: string;
@@ -78,7 +97,7 @@ export default function SlideshowPage() {
     const timerRef = useRef<NodeJS.Timeout | null>(null);
     const [draggedIndex, setDraggedIndex] = useState<number | null>(null);
     const [dragOverIndex, setDragOverIndex] = useState<number | null>(null);
-    
+
     const [previewingAudio, setPreviewingAudio] = useState<string | null>(null);
     const audioPreviewRef = useRef<HTMLAudioElement | null>(null);
 
@@ -132,7 +151,7 @@ export default function SlideshowPage() {
                 return null;
             }
         }));
-        
+
         setImages((prev) => [...prev, ...newImages.filter((img): img is SlideImage => img !== null)]);
     }, []);
 
@@ -320,11 +339,20 @@ export default function SlideshowPage() {
                 // Upload images to S3 concurrently but maybe limit concurrency if needed?
                 // For now, let's use a batched approach if possible, but Promise.all is existing pattern.
                 // We'll stick to Promise.all but we map over `images` state now.
-                
-                const uploadedUrls = await Promise.all(images.map(async (img) => {
-                     const url = await uploadFileToS3(img.file);
-                     return { src: url, color: img.color };
-                }));
+
+                let uploadedUrls;
+                try {
+                    uploadedUrls = await Promise.all(images.map(async (img) => {
+                        const url = await uploadFileToS3(img.file);
+                        return { src: url, color: img.color };
+                    }));
+                } catch (err) {
+                    console.error("Upload failed:", err);
+                    if (err instanceof Error && err.message.includes("Failed to fetch")) {
+                        throw new Error("Upload failed. This is likely a CORS issue. Please run 'npm run update-cors' in your terminal to fix your S3 bucket configuration.");
+                    }
+                    throw err;
+                }
                 imagePayload = uploadedUrls;
 
                 // Upload audio if custom file
@@ -366,13 +394,13 @@ export default function SlideshowPage() {
                 audioDuration: finalAudioDuration,
                 renderMode,
             };
-            
+
             // Log payload without massive base64 strings
             console.log("[SlideshowPage] Generating with payload:", {
                 ...payload,
-                images: payload.images.map(img => 
-                    typeof img === 'object' && img.src && img.src.length > 100 
-                        ? { ...img, src: `[Base64 string length: ${img.src.length}]` } 
+                images: payload.images.map(img =>
+                    typeof img === 'object' && img.src && img.src.length > 100
+                        ? { ...img, src: `[Base64 string length: ${img.src.length}]` }
                         : img
                 ),
                 audio: payload.audio && payload.audio.length > 100 ? `[Base64/URL length: ${payload.audio.length}]` : payload.audio
@@ -429,7 +457,7 @@ export default function SlideshowPage() {
                 // Convert to API download URL to avoid 404s and ensure download
                 const filename = data.url.split('/').pop();
                 const apiDownloadUrl = `/api/download-local?file=${filename}`;
-                
+
                 // If we prefer direct link if available:
                 // setVideoUrl(data.url); 
                 // But user reported 404 issues, so API route is safer.
@@ -476,303 +504,311 @@ export default function SlideshowPage() {
     const playerImages = images.map(img => ({ src: img.src, color: img.color }));
 
     return (
-        <div className="flex h-full overflow-hidden text-slate-900 dark:text-slate-100">
+        <div className="flex h-full overflow-hidden bg-background text-foreground">
             <div className="flex flex-1 overflow-hidden">
-                <aside className="flex w-[260px] shrink-0 flex-col gap-4 overflow-y-auto border-r border-slate-200 bg-slate-50 p-4 dark:border-slate-800 dark:bg-slate-950 md:w-[280px] lg:w-[380px]">
+                <aside className="flex w-[320px] shrink-0 flex-col gap-6 overflow-y-auto border-r bg-muted/30 p-6">
                     {/* Media Panel */}
-                    <section className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm transition-colors dark:border-slate-800 dark:bg-slate-900/60">
-                        <header className="mb-3 flex flex-wrap items-center justify-between gap-2">
-                            <div>
-                                <h2 className="text-xs font-semibold uppercase tracking-[0.2em] text-slate-800 dark:text-slate-300">Media</h2>
-                                <p className="text-[11px] text-slate-600 dark:text-slate-400">Upload images.</p>
+                    <Card>
+                        <CardHeader className="pb-3">
+                            <div className="flex items-center justify-between">
+                                <CardTitle className="text-sm font-medium uppercase tracking-wider text-muted-foreground">Media</CardTitle>
+                                <Button
+                                    variant="ghost"
+                                    size="sm"
+                                    onClick={clearImages}
+                                    disabled={images.length === 0}
+                                    className="h-6 px-2 text-xs uppercase tracking-wider"
+                                >
+                                    Clear
+                                </Button>
                             </div>
-                            <button
-                                type="button"
-                                onClick={clearImages}
-                                disabled={images.length === 0}
-                                className="rounded-full border border-slate-300 px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.2em] text-slate-600 transition hover:border-slate-400 hover:text-slate-900 disabled:opacity-50 dark:border-slate-700 dark:text-slate-300 dark:hover:border-slate-500 dark:hover:text-white"
+                            <CardDescription className="text-xs">Upload and arrange your images.</CardDescription>
+                        </CardHeader>
+                        <CardContent>
+                            <div
+                                className={cn(
+                                    "relative flex flex-col items-center justify-center rounded-lg border-2 border-dashed p-6 transition-colors",
+                                    dragActive ? "border-primary bg-primary/5" : "border-muted-foreground/25 hover:border-primary/50"
+                                )}
+                                onDragEnter={handleDrag}
+                                onDragLeave={handleDrag}
+                                onDragOver={handleDrag}
+                                onDrop={handleDrop}
                             >
-                                Clear
-                            </button>
-                        </header>
-
-                        <div
-                            className={`relative flex flex-col items-center justify-center rounded-xl border border-dashed p-6 transition-colors ${dragActive
-                                ? "border-sky-400 bg-sky-500/10"
-                                : "border-slate-300 bg-slate-50 hover:border-slate-400 dark:border-slate-700 dark:bg-slate-950/50 dark:hover:border-slate-600"
-                                }`}
-                            onDragEnter={handleDrag}
-                            onDragLeave={handleDrag}
-                            onDragOver={handleDrag}
-                            onDrop={handleDrop}
-                        >
-                            <input
-                                type="file"
-                                multiple
-                                accept="image/*"
-                                onChange={handleImageUpload}
-                                className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10"
-                            />
-                            <div className="flex flex-col items-center justify-center text-center">
-                                <p className="text-xs font-medium text-slate-600 dark:text-slate-400">Drag & drop images</p>
-                                <p className="text-[10px] uppercase tracking-wider text-slate-400 dark:text-slate-500 mt-1">or click to browse</p>
-                            </div>
-                        </div>
-
-                        {images.length > 0 && (
-                            <div className="mt-4 grid grid-cols-4 gap-2">
-                                {images.map((img, i) => (
-                                    <div
-                                        key={i}
-                                        draggable
-                                        onDragStart={(e) => handleImageDragStart(e, i)}
-                                        onDragOver={(e) => handleImageDragOver(e, i)}
-                                        onDragLeave={handleImageDragLeave}
-                                        onDrop={(e) => handleImageDrop(e, i)}
-                                        onDragEnd={handleImageDragEnd}
-                                        className={`group relative aspect-square rounded-lg overflow-hidden border-2 cursor-grab active:cursor-grabbing transition-all duration-150 ${
-                                            draggedIndex === i
-                                                ? "opacity-50 scale-95 border-sky-400"
-                                                : dragOverIndex === i
-                                                ? "border-sky-400 ring-2 ring-sky-400/50 scale-105"
-                                                : "border-slate-200 dark:border-slate-800 hover:border-slate-300 dark:hover:border-slate-700"
-                                        }`}
-                                    >
-                                        {/* eslint-disable-next-line @next/next/no-img-element */}
-                                        <img
-                                            src={img.src}
-                                            alt={`Slide ${i}`}
-                                            className="w-full h-full object-cover pointer-events-none"
-                                        />
-                                        {/* Remove button */}
-                                        <button
-                                            type="button"
-                                            onClick={(e) => {
-                                                e.stopPropagation();
-                                                removeImage(i);
-                                            }}
-                                            className="absolute top-1 left-1 w-5 h-5 flex items-center justify-center rounded-full bg-black/60 text-white opacity-0 group-hover:opacity-100 transition-opacity hover:bg-red-500 focus:opacity-100 focus:bg-red-500"
-                                            title="Remove image"
-                                        >
-                                            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" className="w-3 h-3">
-                                                <path d="M6.28 5.22a.75.75 0 00-1.06 1.06L8.94 10l-3.72 3.72a.75.75 0 101.06 1.06L10 11.06l3.72 3.72a.75.75 0 101.06-1.06L11.06 10l3.72-3.72a.75.75 0 00-1.06-1.06L10 8.94 6.28 5.22z" />
-                                            </svg>
-                                        </button>
-                                        {/* Position number */}
-                                        <div className="absolute bottom-0 right-0 bg-black/50 px-1.5 py-0.5 text-[9px] text-white backdrop-blur-sm rounded-tl">
-                                            {i + 1}
-                                        </div>
-                                        {/* Color indicator */}
-                                        <div
-                                            className="absolute top-1 right-1 w-3 h-3 rounded-full border border-white/50 shadow-sm"
-                                            style={{ backgroundColor: img.color }}
-                                            title={`Dominant Color: ${img.color}`}
-                                        />
+                                <Input
+                                    type="file"
+                                    multiple
+                                    accept="image/*"
+                                    onChange={handleImageUpload}
+                                    className="absolute inset-0 h-full w-full cursor-pointer opacity-0"
+                                />
+                                <div className="flex flex-col items-center justify-center text-center space-y-2">
+                                    <div className="rounded-full bg-muted p-2">
+                                        <Upload className="h-4 w-4 text-muted-foreground" />
                                     </div>
-                                ))}
+                                    <div className="space-y-1">
+                                        <p className="text-xs font-medium">Drag & drop images</p>
+                                        <p className="text-[10px] text-muted-foreground uppercase tracking-wider">or click to browse</p>
+                                    </div>
+                                </div>
                             </div>
-                        )}
-                        <p className="mt-3 text-[11px] text-slate-500 dark:text-slate-400 text-center">
-                            {images.length} image{images.length !== 1 ? 's' : ''} selected
-                            {images.length > 1 && <span className="block text-[10px] mt-0.5 opacity-70">Drag to reorder • Hover and click ✕ to remove</span>}
-                        </p>
-                    </section>
+
+                            {images.length > 0 && (
+                                <div className="mt-4 grid grid-cols-3 gap-2">
+                                    {images.map((img, i) => (
+                                        <div
+                                            key={i}
+                                            draggable
+                                            onDragStart={(e) => handleImageDragStart(e, i)}
+                                            onDragOver={(e) => handleImageDragOver(e, i)}
+                                            onDragLeave={handleImageDragLeave}
+                                            onDrop={(e) => handleImageDrop(e, i)}
+                                            onDragEnd={handleImageDragEnd}
+                                            className={cn(
+                                                "group relative aspect-square overflow-hidden rounded-md border bg-background transition-all",
+                                                draggedIndex === i ? "opacity-50 ring-2 ring-primary" : "",
+                                                dragOverIndex === i ? "scale-105 ring-2 ring-primary" : "hover:border-primary/50"
+                                            )}
+                                        >
+                                            <img
+                                                src={img.src}
+                                                alt={`Slide ${i}`}
+                                                className="h-full w-full object-cover"
+                                            />
+                                            <Button
+                                                variant="destructive"
+                                                size="icon"
+                                                onClick={(e) => {
+                                                    e.stopPropagation();
+                                                    removeImage(i);
+                                                }}
+                                                className="absolute left-1 top-1 h-5 w-5 opacity-0 transition-opacity group-hover:opacity-100"
+                                            >
+                                                <X className="h-3 w-3" />
+                                            </Button>
+                                            <div className="absolute bottom-0 right-0 rounded-tl bg-black/60 px-1.5 py-0.5 text-[9px] text-white backdrop-blur-sm">
+                                                {i + 1}
+                                            </div>
+                                            <div
+                                                className="absolute right-1 top-1 h-2.5 w-2.5 rounded-full border border-white/50 shadow-sm"
+                                                style={{ backgroundColor: img.color }}
+                                            />
+                                        </div>
+                                    ))}
+                                </div>
+                            )}
+                            <p className="mt-3 text-center text-[10px] text-muted-foreground">
+                                {images.length} image{images.length !== 1 ? 's' : ''} selected
+                            </p>
+                        </CardContent>
+                    </Card>
 
                     {/* Settings Panel */}
-                    <section className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm transition-colors dark:border-slate-800 dark:bg-slate-900/60">
-                        <header className="mb-3">
-                            <h2 className="text-xs font-semibold uppercase tracking-[0.2em] text-slate-800 dark:text-slate-300">Settings</h2>
-                            <p className="text-[11px] text-slate-600 dark:text-slate-400">Customize your video.</p>
-                        </header>
-
-                        <div className="space-y-4">
-                            <label className="flex flex-col gap-2">
-                                <span className="text-[11px] font-semibold uppercase tracking-[0.25em] text-slate-600 dark:text-slate-400">
-                                    Slide Duration
-                                </span>
-                                <div className="flex items-center gap-3">
-                                    <input
-                                        type="range"
-                                        min="0.5"
-                                        max="10"
-                                        step="0.5"
-                                        value={durationPerSlide}
-                                        onChange={(e) => setDurationPerSlide(Number(e.target.value))}
-                                        className="flex-1 accent-sky-500"
-                                    />
-                                    <span className="w-12 text-right text-xs font-mono text-slate-600 dark:text-slate-300">
-                                        {durationPerSlide}s
-                                    </span>
+                    <Card>
+                        <CardHeader className="pb-3">
+                            <CardTitle className="text-sm font-medium uppercase tracking-wider text-muted-foreground">Settings</CardTitle>
+                            <CardDescription className="text-xs">Customize duration and audio.</CardDescription>
+                        </CardHeader>
+                        <CardContent className="space-y-6">
+                            <div className="space-y-3">
+                                <div className="flex items-center justify-between">
+                                    <Label className="text-xs font-medium uppercase tracking-wider text-muted-foreground">Slide Duration</Label>
+                                    <span className="font-mono text-xs text-muted-foreground">{durationPerSlide}s</span>
                                 </div>
-                            </label>
+                                <Slider
+                                    min={0.5}
+                                    max={10}
+                                    step={0.5}
+                                    value={[durationPerSlide]}
+                                    onValueChange={([val]) => setDurationPerSlide(val)}
+                                />
+                            </div>
 
-                            <div className="flex flex-col gap-2">
-                                <span className="text-[11px] font-semibold uppercase tracking-[0.25em] text-slate-600 dark:text-slate-400">
-                                    Background Music
-                                </span>
+                            <Separator />
 
-                                {/* Upload Music */}
-                                <label className="flex cursor-pointer items-center gap-2 rounded-lg border border-dashed border-slate-300 bg-slate-50 p-2 hover:bg-slate-100 dark:border-slate-700 dark:bg-slate-950/50 dark:hover:bg-slate-900/50">
-                                    <input
+                            <div className="space-y-3">
+                                <Label className="text-xs font-medium uppercase tracking-wider text-muted-foreground">Background Music</Label>
+
+                                <div className="relative">
+                                    <Input
                                         type="file"
                                         accept="audio/*"
                                         onChange={handleMusicUpload}
                                         className="hidden"
+                                        id="music-upload"
                                     />
-                                    <span className="text-xs text-slate-600 dark:text-slate-400 flex-1 truncate">
-                                        {uploadedMusicFile ? `Uploaded: ${uploadedMusicFile.name}` : "Upload audio file"}
-                                    </span>
-                                    <span className="rounded bg-slate-200 px-2 py-0.5 text-[10px] font-medium text-slate-600 dark:bg-slate-800 dark:text-slate-300">
-                                        Browse
-                                    </span>
-                                </label>
+                                    <Label
+                                        htmlFor="music-upload"
+                                        className="flex cursor-pointer items-center gap-2 rounded-md border border-dashed bg-muted/50 p-2 hover:bg-muted"
+                                    >
+                                        <Music className="h-4 w-4 text-muted-foreground" />
+                                        <span className="flex-1 truncate text-xs text-muted-foreground">
+                                            {uploadedMusicFile ? uploadedMusicFile.name : "Upload audio file"}
+                                        </span>
+                                        <span className="rounded bg-muted px-2 py-0.5 text-[10px] font-medium text-muted-foreground">
+                                            Browse
+                                        </span>
+                                    </Label>
+                                </div>
 
-                                {/* Preset Library */}
-                                <div className="mt-2 space-y-2">
-                                    <span className="text-[10px] font-semibold uppercase tracking-[0.25em] text-slate-500 dark:text-slate-500">
-                                        Library
-                                    </span>
-                                    <div className="grid grid-cols-1 gap-2 max-h-40 overflow-y-auto pr-1">
+                                <div className="space-y-2">
+                                    <span className="text-[10px] font-medium uppercase tracking-wider text-muted-foreground">Library</span>
+                                    <div className="max-h-40 space-y-1 overflow-y-auto pr-1">
                                         {musicPresets.map((preset) => (
                                             <div key={preset.id} className="flex items-center gap-2">
-                                                <button
-                                                    type="button"
+                                                <Button
+                                                    variant="outline"
+                                                    size="icon"
+                                                    className="h-8 w-8 shrink-0"
                                                     onClick={() => togglePreview(preset.url, preset.id)}
-                                                    className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full border border-slate-200 bg-white text-slate-600 hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-300 dark:hover:bg-slate-800"
-                                                    title={previewingAudio === preset.id ? "Pause" : "Preview"}
                                                 >
                                                     {previewingAudio === preset.id ? (
-                                                        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" className="h-3 w-3">
-                                                            <path fillRule="evenodd" d="M6.75 5.25a.75.75 0 01.75-.75H9a.75.75 0 01.75.75v13.5a.75.75 0 01-.75.75H7.5a.75.75 0 01-.75-.75V5.25zm7.5 0A.75.75 0 0115 4.5h1.5a.75.75 0 01.75.75v13.5a.75.75 0 01-.75.75H15a.75.75 0 01-.75-.75V5.25z" clipRule="evenodd" />
-                                                        </svg>
+                                                        <Pause className="h-3 w-3" />
                                                     ) : (
-                                                        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" className="h-3 w-3 ml-0.5">
-                                                            <path fillRule="evenodd" d="M4.5 5.653c0-1.426 1.529-2.33 2.779-1.643l11.54 6.348c1.295.712 1.295 2.573 0 3.285L7.28 19.991c-1.25.687-2.779-.217-2.779-1.643V5.653z" clipRule="evenodd" />
-                                                        </svg>
+                                                        <Play className="h-3 w-3 ml-0.5" />
                                                     )}
-                                                </button>
-                                                <button
-                                                    key={preset.id}
+                                                </Button>
+                                                <Button
+                                                    variant={selectedMusic === preset.filename ? "secondary" : "ghost"}
+                                                    className={cn(
+                                                        "h-8 flex-1 justify-start text-xs",
+                                                        selectedMusic === preset.filename && "bg-primary/10 text-primary hover:bg-primary/20"
+                                                    )}
                                                     onClick={() => handlePresetSelect(preset.filename)}
-                                                    className={`flex-1 truncate rounded-lg border px-3 py-2 text-left text-xs transition-colors ${selectedMusic === preset.filename
-                                                        ? "border-sky-400 bg-sky-500/20 text-sky-700 dark:text-sky-100"
-                                                        : "border-slate-200 bg-white text-slate-600 hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-950/40 dark:text-slate-300 dark:hover:bg-slate-900"
-                                                        }`}
                                                 >
                                                     {preset.name}
-                                                </button>
+                                                </Button>
                                             </div>
                                         ))}
-                                        {musicPresets.length === 0 && (
-                                            <p className="text-center text-[10px] italic text-slate-400">No presets found.</p>
-                                        )}
                                     </div>
                                 </div>
 
-                                <label className="flex items-center gap-2 mt-4">
+                                <div className="flex items-center gap-2">
                                     <input
                                         type="checkbox"
+                                        id="audio-loop"
                                         checked={audioLoop}
                                         onChange={(e) => setAudioLoop(e.target.checked)}
-                                        className="h-3 w-3 rounded border-slate-300 text-sky-500 focus:ring-sky-500 dark:border-slate-700 dark:bg-slate-950/60"
+                                        className="h-3.5 w-3.5 rounded border-primary text-primary focus:ring-primary"
                                     />
-                                    <span className="text-[11px] font-semibold uppercase tracking-[0.25em] text-slate-600 dark:text-slate-400">
-                                        Loop audio {audioDuration ? `(${audioDuration.toFixed(1)}s)` : "(?)"}
-                                    </span>
-                                </label>
+                                    <Label htmlFor="audio-loop" className="text-[10px] font-medium uppercase tracking-wider text-muted-foreground">
+                                        Loop audio {audioDuration ? `(${audioDuration.toFixed(1)}s)` : ""}
+                                    </Label>
+                                </div>
                             </div>
-                        </div>
-                    </section>
+                        </CardContent>
+                    </Card>
 
                     {/* Export Panel */}
-                    <section className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm transition-colors dark:border-slate-800 dark:bg-slate-900/60">
-                        <header className="mb-3">
-                            <h2 className="text-xs font-semibold uppercase tracking-[0.2em] text-slate-800 dark:text-slate-300">Export</h2>
-                            <p className="text-[11px] text-slate-600 dark:text-slate-400">Render and download.</p>
-                        </header>
-
-                        <div className="flex flex-col gap-2">
+                    <Card>
+                        <CardHeader className="pb-3">
+                            <CardTitle className="text-sm font-medium uppercase tracking-wider text-muted-foreground">Export</CardTitle>
+                            <CardDescription className="text-xs">Render and download your video.</CardDescription>
+                        </CardHeader>
+                        <CardContent className="space-y-4">
                             {isGenerating ? (
-                                <div className="rounded-xl border border-slate-200 bg-slate-50 p-4 dark:border-slate-800 dark:bg-slate-900/50">
-                                    <div className="mb-2 flex items-center justify-between text-[10px] font-medium uppercase tracking-wider text-slate-500">
-                                        <span>{renderStatus}</span>
+                                <div className="rounded-lg border bg-muted/50 p-4">
+                                    <div className="mb-2 flex items-center justify-between text-[10px] font-medium uppercase tracking-wider text-muted-foreground">
+                                        <span className="flex items-center gap-2">
+                                            <Loader2 className="h-3 w-3 animate-spin" />
+                                            {renderStatus}
+                                        </span>
                                         <span className="font-mono">{Math.floor(elapsedTime / 60)}:{(elapsedTime % 60).toString().padStart(2, '0')}</span>
                                     </div>
-                                    <div className="h-2 w-full overflow-hidden rounded-full bg-slate-200 dark:bg-slate-800">
+                                    <div className="h-1.5 w-full overflow-hidden rounded-full bg-muted">
                                         <div
-                                            className="h-full bg-sky-500 transition-all duration-300 ease-out"
+                                            className="h-full bg-primary transition-all duration-300 ease-out"
                                             style={{ width: `${Math.max(5, progress * 100)}%` }}
                                         />
                                     </div>
                                 </div>
                             ) : (
-                                <>
-                                    <button
+                                <div className="grid gap-2">
+                                    <Button
                                         onClick={() => handleGenerate('lambda')}
                                         disabled={images.length === 0}
-                                        className="w-full inline-flex items-center justify-center rounded-full bg-sky-500/15 px-4 py-3 text-[11px] font-semibold uppercase tracking-[0.3em] text-sky-700 shadow-inner shadow-sky-500/20 transition hover:bg-sky-500/25 disabled:cursor-not-allowed disabled:opacity-60 dark:bg-sky-500/10 dark:text-sky-100 dark:hover:bg-sky-500/20"
+                                        className="w-full"
                                     >
+                                        <Film className="mr-2 h-4 w-4" />
                                         Render with Lambda
-                                    </button>
-                                    <button
+                                    </Button>
+                                    <Button
+                                        variant="outline"
                                         onClick={() => handleGenerate('local')}
                                         disabled={images.length === 0}
-                                        className="w-full inline-flex items-center justify-center rounded-full border border-slate-200 bg-white px-4 py-3 text-[11px] font-semibold uppercase tracking-[0.3em] text-slate-600 transition hover:bg-slate-50 hover:text-slate-900 disabled:cursor-not-allowed disabled:opacity-60 dark:border-slate-800 dark:bg-transparent dark:text-slate-400 dark:hover:bg-slate-800 dark:hover:text-slate-200"
+                                        className="w-full"
                                     >
                                         Render Locally
-                                    </button>
-                                </>
+                                    </Button>
+                                </div>
                             )}
-                        </div>
 
-                        {videoUrl && (
-                            <div className="mt-4 space-y-3 animate-in fade-in slide-in-from-top-2">
-                                <div className="rounded-lg border border-emerald-200 bg-emerald-50 p-3 text-center dark:border-emerald-900/50 dark:bg-emerald-900/20">
-                                    <p className="text-xs font-medium text-emerald-700 dark:text-emerald-300">Video Ready!</p>
-                                </div>
-                                <div className="flex flex-col gap-2">
-                                    <a
-                                        href={videoUrl}
-                                        download
-                                        className="w-full inline-flex items-center justify-center rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs font-medium text-slate-700 transition hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200 dark:hover:bg-slate-800"
-                                    >
-                                        Download MP4
-                                    </a>
-                                    <button
-                                        onClick={handleUploadToCdn}
-                                        disabled={isCdnUploading}
-                                        className="w-full inline-flex items-center justify-center rounded-lg bg-indigo-600 px-3 py-2 text-xs font-medium text-white transition hover:bg-indigo-700 disabled:opacity-50"
-                                    >
-                                        {isCdnUploading ? "Uploading..." : "Upload to CDN"}
-                                    </button>
-                                </div>
-
-                                {cdnUrl && (
-                                    <div className="rounded-lg border border-slate-200 bg-slate-50 p-2 dark:border-slate-700 dark:bg-slate-900">
-                                        <p className="mb-1 text-[10px] font-medium uppercase text-slate-500">CDN Link</p>
-                                        <div className="flex gap-1">
-                                            <input
-                                                readOnly
-                                                value={cdnUrl}
-                                                className="flex-1 rounded border border-slate-300 bg-white px-2 py-1 text-xs text-slate-600 focus:border-sky-500 focus:outline-none dark:border-slate-600 dark:bg-slate-800 dark:text-slate-300"
-                                                onClick={(e) => e.currentTarget.select()}
-                                            />
-                                            <button
-                                                onClick={() => navigator.clipboard.writeText(cdnUrl)}
-                                                className="rounded border border-slate-300 bg-white px-2 py-1 text-xs font-medium text-slate-600 hover:bg-slate-50 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-300 dark:hover:bg-slate-700"
-                                            >
-                                                Copy
-                                            </button>
-                                        </div>
+                            {videoUrl && (
+                                <div className="animate-in fade-in slide-in-from-top-2 space-y-3">
+                                    <div className="rounded-md border border-emerald-500/20 bg-emerald-500/10 p-3 text-center">
+                                        <p className="flex items-center justify-center gap-2 text-xs font-medium text-emerald-600 dark:text-emerald-400">
+                                            <Check className="h-3 w-3" />
+                                            Video Ready!
+                                        </p>
                                     </div>
-                                )}
-                            </div>
-                        )}
-                    </section>
+                                    <div className="grid gap-2">
+                                        <Button
+                                            variant="secondary"
+                                            asChild
+                                            className="w-full cursor-pointer"
+                                        >
+                                            <a href={videoUrl} download>
+                                                <Download className="mr-2 h-4 w-4" />
+                                                Download MP4
+                                            </a>
+                                        </Button>
+                                        <Button
+                                            variant="outline"
+                                            onClick={handleUploadToCdn}
+                                            disabled={isCdnUploading}
+                                            className="w-full"
+                                        >
+                                            {isCdnUploading ? (
+                                                <Loader2 className="mr-2 h-3 w-3 animate-spin" />
+                                            ) : (
+                                                <Upload className="mr-2 h-3 w-3" />
+                                            )}
+                                            {isCdnUploading ? "Uploading..." : "Upload to CDN"}
+                                        </Button>
+                                    </div>
+
+                                    {cdnUrl && (
+                                        <div className="rounded-md border bg-muted/50 p-2">
+                                            <p className="mb-1 text-[10px] font-medium uppercase text-muted-foreground">CDN Link</p>
+                                            <div className="flex gap-1">
+                                                <Input
+                                                    readOnly
+                                                    value={cdnUrl}
+                                                    className="h-7 text-xs"
+                                                    onClick={(e) => e.currentTarget.select()}
+                                                />
+                                                <Button
+                                                    variant="ghost"
+                                                    size="icon"
+                                                    className="h-7 w-7"
+                                                    onClick={() => {
+                                                        navigator.clipboard.writeText(cdnUrl);
+                                                        toast.success("Copied to clipboard");
+                                                    }}
+                                                >
+                                                    <Copy className="h-3 w-3" />
+                                                </Button>
+                                            </div>
+                                        </div>
+                                    )}
+                                </div>
+                            )}
+                        </CardContent>
+                    </Card>
                 </aside>
 
-                <main className="flex flex-1 flex-col items-center justify-center overflow-hidden bg-slate-100 p-8 dark:bg-slate-950">
-                    <div className="relative flex aspect-[9/16] h-full max-h-[800px] w-auto flex-col overflow-hidden rounded-2xl bg-black shadow-2xl ring-1 ring-slate-900/10 dark:ring-slate-100/10">
+                <main className="flex flex-1 flex-col items-center justify-center overflow-hidden bg-muted/10 p-8">
+                    <div className="relative flex aspect-[9/16] h-full max-h-[800px] w-auto flex-col overflow-hidden rounded-xl border bg-black shadow-2xl">
                         <Player
                             component={SlideshowComposition}
                             inputProps={{
@@ -791,7 +827,7 @@ export default function SlideshowPage() {
                             controls
                         />
                     </div>
-                    <p className="mt-4 text-center text-xs text-slate-500 dark:text-slate-400">
+                    <p className="mt-4 text-center text-xs text-muted-foreground">
                         Preview (9:16 Vertical) • {Math.round(durationInFrames / fps)}s
                     </p>
                 </main>

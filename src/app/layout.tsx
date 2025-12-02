@@ -58,7 +58,7 @@ export default function RootLayout({
       </head>
       <body className={`${geistSans.variable} ${geistMono.variable} antialiased`}>
         <ThemeWatcher />
-        <div className="flex h-screen flex-col overflow-hidden bg-slate-100 dark:bg-slate-950 transition-colors duration-200">
+        <div className="flex h-screen flex-col overflow-hidden bg-background transition-colors duration-200">
           <Header />
           <div className="flex-1 overflow-hidden">
             {children}

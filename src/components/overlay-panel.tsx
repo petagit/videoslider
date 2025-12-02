@@ -2,6 +2,12 @@
 
 import { ChangeEvent, useState } from "react";
 import { useAppStore } from "../state/store";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "./ui/card";
+import { Button } from "./ui/button";
+import { Label } from "./ui/label";
+import { Input } from "./ui/input";
+import { ChevronDown } from "lucide-react";
+import { cn } from "@/lib/utils";
 
 export function OverlayPanel() {
   const [isTextSettingsOpen, setIsTextSettingsOpen] = useState<boolean>(true);
@@ -58,54 +64,44 @@ export function OverlayPanel() {
   };
 
   return (
-    <section className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm transition-colors dark:border-slate-800 dark:bg-slate-900/60">
-      <header className="mb-3">
-        <h2 className="text-xs font-semibold uppercase tracking-[0.2em] text-slate-800 dark:text-slate-300">
+    <Card>
+      <CardHeader className="pb-3">
+        <CardTitle className="text-sm font-medium uppercase tracking-wider text-muted-foreground">
           Overlay
-        </h2>
-        <p className="text-[11px] text-slate-600 dark:text-slate-400">Markdown text overlay.</p>
-      </header>
+        </CardTitle>
+        <CardDescription className="text-xs">Markdown text overlay.</CardDescription>
+      </CardHeader>
 
-      <div className="flex flex-col gap-3">
+      <CardContent className="space-y-3">
         <div className="flex flex-col gap-2">
-          <label className="text-[11px] font-semibold uppercase tracking-[0.3em] text-slate-600 dark:text-slate-400">
+          <Label className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
             Markdown
-          </label>
+          </Label>
           <textarea
             id="markdown-textarea"
             value={markdown}
             onChange={handleTextChange}
             rows={4}
-            className="min-h-[80px] resize-y rounded-lg border border-slate-300 bg-white p-2.5 text-sm text-slate-700 placeholder:text-slate-400 focus:border-sky-400 focus:outline-none dark:border-slate-700 dark:bg-slate-950/60 dark:text-slate-100 dark:placeholder:text-slate-500"
+            className="min-h-[80px] resize-y rounded-lg border bg-background p-2.5 text-sm text-foreground placeholder:text-muted-foreground focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
             placeholder="Write overlay copy in Markdown"
           />
         </div>
 
-        <div className="flex flex-col gap-2 rounded-lg border border-slate-200 bg-slate-50 dark:border-slate-800 dark:bg-slate-950/40">
-          <button
-            type="button"
+        <div className="flex flex-col gap-2 rounded-lg border bg-card">
+          <Button
+            variant="ghost"
             onClick={() => setIsTextSettingsOpen(!isTextSettingsOpen)}
-            className="flex items-center justify-between gap-2 rounded-lg p-2.5 text-left transition-colors hover:bg-slate-100 dark:hover:bg-slate-900/60"
+            className="flex w-full items-center justify-between gap-2 rounded-lg p-2.5 text-left text-xs font-medium uppercase tracking-wider text-muted-foreground"
           >
-            <span className="text-[11px] font-semibold uppercase tracking-[0.25em] text-slate-600 dark:text-slate-400">
-              Text Settings
-            </span>
-            <svg
-              className={`h-4 w-4 text-slate-500 transition-transform dark:text-slate-400 ${
-                isTextSettingsOpen ? "rotate-180" : ""
-              }`}
-              fill="none"
-              viewBox="0 0 24 24"
-              stroke="currentColor"
-            >
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-            </svg>
-          </button>
+            Text Settings
+            <ChevronDown className={cn("h-4 w-4 transition-transform", isTextSettingsOpen && "rotate-180")} />
+          </Button>
           {isTextSettingsOpen && (
             <div className="flex flex-col gap-2 px-2.5 pb-2.5">
+              {/* Font size and max width sliders - keep existing for now */}
               <div className="grid grid-cols-2 gap-2">
-                <label className="flex flex-col gap-1.5 rounded-lg bg-slate-100 p-2.5 transition-colors dark:bg-slate-950/40">
-                  <span className="text-[11px] font-semibold uppercase tracking-[0.25em] text-slate-600 dark:text-slate-400">
+                <label className="flex flex-col gap-1.5 rounded-lg bg-muted p-2.5">
+                  <span className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
                     Font size
                   </span>
                   <input
@@ -115,10 +111,10 @@ export function OverlayPanel() {
                     value={fontSizePx}
                     onChange={handleFontSize}
                   />
-                  <span className="text-xs text-slate-600 dark:text-slate-300">{fontSizePx}px</span>
+                  <span className="text-xs text-muted-foreground">{fontSizePx}px</span>
                 </label>
-                <label className="flex flex-col gap-1.5 rounded-lg bg-slate-100 p-2.5 transition-colors dark:bg-slate-950/40">
-                  <span className="text-[11px] font-semibold uppercase tracking-[0.25em] text-slate-600 dark:text-slate-400">
+                <label className="flex flex-col gap-1.5 rounded-lg bg-muted p-2.5">
+                  <span className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
                     Max width
                   </span>
                   <input
@@ -128,13 +124,13 @@ export function OverlayPanel() {
                     value={maxWidthPct}
                     onChange={handleWidth}
                   />
-                  <span className="text-xs text-slate-600 dark:text-slate-300">{maxWidthPct}% of stage</span>
+                  <span className="text-xs text-muted-foreground">{maxWidthPct}% of stage</span>
                 </label>
               </div>
 
               <div className="grid grid-cols-2 gap-2">
-                <label className="flex flex-col gap-1.5 rounded-lg bg-slate-100 p-2.5 transition-colors dark:bg-slate-950/40">
-                  <span className="text-[11px] font-semibold uppercase tracking-[0.25em] text-slate-600 dark:text-slate-400">
+                <label className="flex flex-col gap-1.5 rounded-lg bg-muted p-2.5">
+                  <span className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
                     Text color
                   </span>
                   <div className="flex items-center gap-2">
@@ -144,16 +140,16 @@ export function OverlayPanel() {
                       onChange={handleColor}
                       className="h-8 w-8 cursor-pointer rounded"
                     />
-                    <input
+                    <Input
                       type="text"
                       value={color}
                       onChange={handleColor}
-                      className="flex-1 rounded border border-slate-300 bg-white px-2 py-1 text-xs text-slate-700 focus:border-sky-400 focus:outline-none dark:border-slate-700 dark:bg-slate-950/60 dark:text-slate-100"
+                      className="h-8 flex-1 text-xs"
                     />
                   </div>
                 </label>
-                <label className="flex flex-col gap-1.5 rounded-lg bg-slate-100 p-2.5 transition-colors dark:bg-slate-950/40">
-                  <span className="text-[11px] font-semibold uppercase tracking-[0.25em] text-slate-600 dark:text-slate-400">
+                <label className="flex flex-col gap-1.5 rounded-lg bg-muted p-2.5">
+                  <span className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
                     Background
                   </span>
                   <div className="flex items-center gap-2">
@@ -163,50 +159,50 @@ export function OverlayPanel() {
                       onChange={handleBackground}
                       className="h-8 w-8 cursor-pointer rounded"
                     />
-                    <input
+                    <Input
                       type="text"
                       value={background ?? ""}
                       onChange={handleBackground}
                       placeholder="rgba(...) or hex"
-                      className="flex-1 rounded border border-slate-300 bg-white px-2 py-1 text-xs text-slate-700 placeholder:text-slate-400 focus:border-sky-400 focus:outline-none dark:border-slate-700 dark:bg-slate-950/60 dark:text-slate-100 dark:placeholder:text-slate-500"
+                      className="h-8 flex-1 text-xs"
                     />
                   </div>
-                  <span className="mt-0.5 text-[11px] text-slate-600 dark:text-slate-400">Leave blank for transparent.</span>
+                  <span className="mt-0.5 text-[11px] text-muted-foreground">Leave blank for transparent.</span>
                 </label>
               </div>
 
               <div className="grid grid-cols-2 gap-2">
-                <label className="flex flex-col gap-1.5 rounded-lg bg-slate-100 p-2.5 transition-colors dark:bg-slate-950/40">
-                  <span className="text-[11px] font-semibold uppercase tracking-[0.25em] text-slate-600 dark:text-slate-400">Border width</span>
+                <label className="flex flex-col gap-1.5 rounded-lg bg-muted p-2.5">
+                  <span className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">Border width</span>
                   <input type="range" min={0} max={16} value={borderWidthPx} onChange={handleBorderWidth} />
-                  <span className="text-xs text-slate-600 dark:text-slate-300">{borderWidthPx}px</span>
+                  <span className="text-xs text-muted-foreground">{borderWidthPx}px</span>
                 </label>
-                <label className="flex flex-col gap-1.5 rounded-lg bg-slate-100 p-2.5 transition-colors dark:bg-slate-950/40">
-                  <span className="text-[11px] font-semibold uppercase tracking-[0.25em] text-slate-600 dark:text-slate-400">Border radius</span>
+                <label className="flex flex-col gap-1.5 rounded-lg bg-muted p-2.5">
+                  <span className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">Border radius</span>
                   <input type="range" min={0} max={48} value={borderRadiusPx} onChange={handleBorderRadius} />
-                  <span className="text-xs text-slate-600 dark:text-slate-300">{borderRadiusPx}px</span>
+                  <span className="text-xs text-muted-foreground">{borderRadiusPx}px</span>
                 </label>
               </div>
 
               <div className="grid grid-cols-2 gap-2">
-                <label className="flex flex-col gap-1.5 rounded-lg bg-slate-100 p-2.5 transition-colors dark:bg-slate-950/40">
-                  <span className="text-[11px] font-semibold uppercase tracking-[0.25em] text-slate-600 dark:text-slate-400">Border color</span>
+                <label className="flex flex-col gap-1.5 rounded-lg bg-muted p-2.5">
+                  <span className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">Border color</span>
                   <div className="flex items-center gap-2">
                     <input type="color" value={borderColor} onChange={handleBorderColor} className="h-8 w-8 cursor-pointer rounded" />
-                    <input
+                    <Input
                       type="text"
                       value={borderColor}
                       onChange={handleBorderColor}
-                      className="flex-1 rounded border border-slate-300 bg-white px-2 py-1 text-xs text-slate-700 focus:border-sky-400 focus:outline-none dark:border-slate-700 dark:bg-slate-950/60 dark:text-slate-100"
+                      className="h-8 flex-1 text-xs"
                     />
                   </div>
                 </label>
-                <label className="flex flex-col gap-1.5 rounded-lg bg-slate-100 p-2.5 transition-colors dark:bg-slate-950/40">
-                  <span className="text-[11px] font-semibold uppercase tracking-[0.25em] text-slate-600 dark:text-slate-400">Border style</span>
+                <label className="flex flex-col gap-1.5 rounded-lg bg-muted p-2.5">
+                  <span className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">Border style</span>
                   <select
                     value={borderStyle}
                     onChange={handleBorderStyle}
-                    className="rounded-xl border border-slate-300 bg-white px-3 py-2 text-xs text-slate-700 focus:border-sky-400 focus:outline-none dark:border-slate-700 dark:bg-slate-950/60 dark:text-slate-100"
+                    className="rounded-lg border bg-background px-3 py-2 text-xs text-foreground focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
                   >
                     <option value="none">None</option>
                     <option value="solid">Solid</option>
@@ -225,21 +221,17 @@ export function OverlayPanel() {
             ["center", "Center"],
             ["right", "Right"],
           ] as const).map(([value, label]) => (
-            <button
+            <Button
               key={value}
-              type="button"
+              variant={align === value ? "default" : "secondary"}
               onClick={() => setOverlayAlignment(value)}
-              className={`flex-1 rounded-full px-3 py-2 text-[11px] font-semibold uppercase tracking-[0.3em] transition ${
-                align === value
-                  ? "bg-sky-500/25 text-sky-700 dark:bg-sky-500/30 dark:text-sky-100"
-                  : "bg-slate-200 text-slate-700 hover:bg-slate-300 dark:bg-slate-950/40 dark:text-slate-400 dark:hover:bg-slate-900/60"
-              }`}
+              className="flex-1 text-xs uppercase tracking-wider"
             >
               {label}
-            </button>
+            </Button>
           ))}
         </div>
-      </div>
-    </section>
+      </CardContent>
+    </Card>
   );
 }
